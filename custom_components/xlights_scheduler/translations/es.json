@@ -1,0 +1,62 @@
+{
+  "title": "xLights Scheduler",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Conectar a xSchedule",
+        "data": {
+          "host": "Host/IP",
+          "port": "Puerto",
+          "password": "Contraseña (opcional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "No se puede conectar o autenticar"
+    },
+    "options": {
+      "step": {
+        "init": {
+          "data": {
+            "poll_interval_playing": "Intervalo de sondeo (s) en reproducción/pausa",
+            "poll_interval_idle": "Intervalo de sondeo (s) en inactividad",
+            "enable_browse_media": "Habilitar explorador de medios",
+            "lists_refresh_secs": "Actualizar listas/pasos cada (s)"
+          }
+        }
+      }
+    }
+  },
+  "entity": {
+    "media_player": {
+      "xlights": { "name": "xLights Scheduler" }
+    },
+    "switch": {
+      "output_to_lights": { "name": "Salida a luces" },
+      "playlist_loop": { "name": "Bucle de lista de reproducción" },
+      "test_mode": { "name": "Modo de prueba" }
+    },
+    "number": {
+      "brightness": { "name": "Brillo" }
+    },
+    "select": {
+      "playlist": { "name": "Lista de reproducción" },
+      "step": { "name": "Paso" },
+      "background_playlist": { "name": "Lista de reproducción de fondo" }
+    },
+    "button": {
+      "next_step": { "name": "Siguiente paso" },
+      "prior_step": { "name": "Paso anterior" },
+      "restart_step": { "name": "Reiniciar paso" },
+      "stop_all_now": { "name": "Detener todo ahora" },
+      "close_xschedule": { "name": "Cerrar xSchedule" }
+    },
+    "sensor": {
+      "playlist_step_count": { "name": "Cantidad de pasos de la lista" },
+      "current_playlist_step": { "name": "Paso actual de la lista" },
+      "next_scheduled_start": { "name": "Próximo inicio programado" },
+      "next_scheduled_playlist": { "name": "Próxima lista de reproducción programada" },
+      "xschedule_version": { "name": "Versión de xSchedule" }
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "title": "xLights Scheduler",
+  "entity": {
+    "media_player": {
+      "xlights": { "name": "xLights Scheduler" }
+    },
+    "switch": {
+      "output_to_lights": { "name": "Output to lights" },
+      "playlist_loop": { "name": "Playlist loop" },
+      "test_mode": { "name": "Test mode" }
+    },
+    "number": {
+      "brightness": { "name": "Brightness" }
+    },
+    "select": {
+      "playlist": { "name": "Playlist" },
+      "step": { "name": "Step" },
+      "background_playlist": { "name": "Background playlist" }
+    },
+    "button": {
+      "next_step": { "name": "Next step" },
+      "prior_step": { "name": "Prior step" },
+      "restart_step": { "name": "Restart step" },
+      "stop_all_now": { "name": "Stop all now" },
+      "close_xschedule": { "name": "Close xSchedule" }
+    },
+    "sensor": {
+      "playlist_step_count": { "name": "Playlist step count" },
+      "current_playlist_step": { "name": "Current playlist step" },
+      "next_scheduled_start": { "name": "Next scheduled start" },
+      "next_scheduled_playlist": { "name": "Next scheduled playlist" },
+      "xschedule_version": { "name": "xSchedule version" }
+    }
+  },
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to xSchedule",
+        "data": {
+          "host": "Host/IP",
+          "port": "Port",
+          "password": "Password (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect or authenticate"
+    },
+    "options": {
+      "step": {
+        "init": {
+          "data": {
+            "poll_interval_playing": "Polling interval (s) when playing/paused",
+            "poll_interval_idle": "Polling interval (s) when idle",
+            "enable_browse_media": "Enable Browse Media",
+            "lists_refresh_secs": "Refresh playlists/steps every (s)"
+          }
+        }
+      }
+    }
+  }
+}

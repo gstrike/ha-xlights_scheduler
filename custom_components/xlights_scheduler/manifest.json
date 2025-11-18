@@ -1,0 +1,12 @@
+{
+  "domain": "xlights_scheduler",
+  "name": "xLights Scheduler",
+  "version": "0.1.0",
+  "documentation": "https://github.com/gstrike/ha-xlights-scheduler#readme",
+  "issue_tracker": "https://github.com/gstrike/ha-xlights-scheduler/issues",
+  "icon": "mdi:home-clock",
+  "codeowners": ["@gstrike"],
+  "iot_class": "local_polling",
+  "config_flow": true,
+  "requirements": []
+}

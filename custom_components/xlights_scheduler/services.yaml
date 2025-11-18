@@ -1,0 +1,159 @@
+play_playlist:
+  name: Play playlist
+  description: Play a specified playlist (once or looped).
+  fields:
+    playlist:
+      name: Playlist
+      description: Playlist name or id:<num>
+      required: true
+      selector:
+        text:
+    looped:
+      name: Looped
+      description: Play the playlist looped
+      default: false
+      selector:
+        boolean:
+
+stop_playlist:
+  name: Stop playlist
+  description: Stop the current playlist.
+
+play_step:
+  name: Play playlist step
+  description: Play a specific step from a playlist.
+  fields:
+    playlist:
+      name: Playlist
+      description: Playlist name or id:<num>
+      required: true
+      selector:
+        text:
+    step:
+      name: Step
+      description: Step name or id:<num>
+      required: true
+      selector:
+        text:
+    looped:
+      name: Looped
+      description: Loop the step repeatedly
+      default: false
+      selector:
+        boolean:
+
+seek_ms:
+  name: Seek (ms)
+  description: Seek current step to a position in milliseconds.
+  fields:
+    position_ms:
+      name: Position (ms)
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+
+toggle_playlist_loop:
+  name: Toggle playlist loop
+  description: Toggle loop state of the current playlist.
+
+set_playlist_loop:
+  name: Set playlist loop
+  description: Set loop state of the current playlist.
+  fields:
+    state:
+      name: State
+      required: true
+      selector:
+        boolean:
+
+toggle_output_to_lights:
+  name: Toggle output to lights
+  description: Toggle output to lights on/off.
+
+set_output_to_lights:
+  name: Set output to lights
+  description: Set output to lights state.
+  fields:
+    state:
+      name: State
+      required: true
+      selector:
+        boolean:
+
+set_volume:
+  name: Set volume
+  description: Set volume (0-100).
+  fields:
+    volume:
+      name: Volume
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 100
+          mode: slider
+
+adjust_volume:
+  name: Adjust volume
+  description: Adjust volume (-100 to 100).
+  fields:
+    delta:
+      name: Delta
+      required: true
+      selector:
+        number:
+          min: -100
+          max: 100
+          mode: slider
+
+start_test_mode:
+  name: Start test mode
+  description: Start test mode with optional parameters.
+  fields:
+    mode:
+      name: Mode
+      description: One of Alternate, Foreground, A-B-C, A-B-C-All, A-B-C-All-None, A, B, C
+      selector:
+        select:
+          options:
+            - Alternate
+            - Foreground
+            - A-B-C
+            - A-B-C-All
+            - A-B-C-All-None
+            - A
+            - B
+            - C
+    model:
+      name: Model name
+      description: Optional model to limit test to
+      selector:
+        text:
+    interval:
+      name: Interval (ms)
+      description: Optional frame interval in ms
+      selector:
+        number:
+          min: 1
+          max: 10000
+          mode: box
+    foreground:
+      name: Foreground level (0-255)
+      selector:
+        number:
+          min: 0
+          max: 255
+          mode: slider
+    background:
+      name: Background level (0-255)
+      selector:
+        number:
+          min: 0
+          max: 255
+          mode: slider
+
+stop_test_mode:
+  name: Stop test mode
+  description: Stop test mode.
