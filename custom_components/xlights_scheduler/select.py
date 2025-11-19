@@ -33,6 +33,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class PlaylistSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "playlist"
+    _attr_icon = "mdi:playlist-music"
 
     def __init__(self, hass: HomeAssistant, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
@@ -74,6 +75,7 @@ class PlaylistSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
 class StepSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "step"
+    _attr_icon = "mdi:format-list-numbered"
 
     def __init__(self, hass: HomeAssistant, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
@@ -161,6 +163,7 @@ class BackgroundPlaylistSelect(CoordinatorEntity[XScheduleCoordinator], SelectEn
     _attr_has_entity_name = True
     _attr_translation_key = "background_playlist"
     _attr_entity_category = EntityCategory.CONFIG
+    _attr_icon = "mdi:playlist-music-outline"
 
     def __init__(self, hass: HomeAssistant, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)

@@ -39,6 +39,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class OutputToLightsSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "output_to_lights"
+    _attr_icon = "mdi:lightbulb-on"
 
     def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
@@ -76,6 +77,7 @@ class OutputToLightsSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity
 class PlaylistLoopSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "playlist_loop"
+    _attr_icon = "mdi:repeat"
 
     def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
@@ -119,6 +121,7 @@ class TestModeSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "test_mode"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:test-tube"
 
     def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)

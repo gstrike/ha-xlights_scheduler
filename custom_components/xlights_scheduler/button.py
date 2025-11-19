@@ -51,6 +51,7 @@ class BaseXScheduleButton(CoordinatorEntity[XScheduleCoordinator], ButtonEntity)
 class NextStepButton(BaseXScheduleButton):
     _attr_has_entity_name = True
     _attr_translation_key = "next_step"
+    _attr_icon = "mdi:skip-next"
 
     @property
     def unique_id(self) -> str:
@@ -64,6 +65,7 @@ class NextStepButton(BaseXScheduleButton):
 class PriorStepButton(BaseXScheduleButton):
     _attr_has_entity_name = True
     _attr_translation_key = "prior_step"
+    _attr_icon = "mdi:skip-previous"
 
     @property
     def unique_id(self) -> str:
@@ -77,6 +79,7 @@ class PriorStepButton(BaseXScheduleButton):
 class RestartStepButton(BaseXScheduleButton):
     _attr_has_entity_name = True
     _attr_translation_key = "restart_step"
+    _attr_icon = "mdi:restart"
 
     @property
     def unique_id(self) -> str:
@@ -90,6 +93,7 @@ class RestartStepButton(BaseXScheduleButton):
 class StopAllNowButton(BaseXScheduleButton):
     _attr_has_entity_name = True
     _attr_translation_key = "stop_all_now"
+    _attr_icon = "mdi:stop-circle"
 
     @property
     def unique_id(self) -> str:
@@ -103,6 +107,7 @@ class StopAllNowButton(BaseXScheduleButton):
 class CloseXScheduleButton(BaseXScheduleButton):
     _attr_has_entity_name = True
     _attr_translation_key = "close_xschedule"
+    _attr_icon = "mdi:close-circle"
 
     @property
     def unique_id(self) -> str:

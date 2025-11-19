@@ -42,6 +42,7 @@ class PlaylistStepCountSensor(CoordinatorEntity[XScheduleCoordinator], SensorEnt
     _attr_has_entity_name = True
     _attr_translation_key = "playlist_step_count"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:counter"
 
     def __init__(self, hass: HomeAssistant, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
@@ -105,6 +106,7 @@ class CurrentPlaylistStepSensor(CoordinatorEntity[XScheduleCoordinator], SensorE
     _attr_has_entity_name = True
     _attr_translation_key = "current_playlist_step"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:playlist-play"
 
     def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
@@ -182,6 +184,7 @@ class NextScheduledPlaylistSensor(CoordinatorEntity[XScheduleCoordinator], Senso
     _attr_has_entity_name = True
     _attr_translation_key = "next_scheduled_playlist"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:playlist-music"
 
     def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
