@@ -7,7 +7,7 @@
         "data": {
           "host": "Host/IP",
           "port": "Puerto",
-          "password": "Contraseña (opcional)"
+          "password": "ContraseA�a (opcional)"
         }
       }
     },
@@ -18,7 +18,7 @@
       "step": {
         "init": {
           "data": {
-            "poll_interval_playing": "Intervalo de sondeo (s) en reproducción/pausa",
+            "poll_interval_playing": "Intervalo de sondeo (s) en reproducciA3n/pausa",
             "poll_interval_idle": "Intervalo de sondeo (s) en inactividad",
             "enable_browse_media": "Habilitar explorador de medios",
             "lists_refresh_secs": "Actualizar listas/pasos cada (s)"
@@ -33,16 +33,16 @@
     },
     "switch": {
       "output_to_lights": { "name": "Salida a luces" },
-      "playlist_loop": { "name": "Bucle de lista de reproducción" },
+      "playlist_loop": { "name": "Bucle de lista de reproducciA3n" },
       "test_mode": { "name": "Modo de prueba" }
     },
     "number": {
       "brightness": { "name": "Brillo" }
     },
     "select": {
-      "playlist": { "name": "Lista de reproducción" },
+      "playlist": { "name": "Lista de reproducciA3n" },
       "step": { "name": "Paso" },
-      "background_playlist": { "name": "Lista de reproducción de fondo" }
+      "background_playlist": { "name": "Lista de reproducciA3n de fondo" }
     },
     "button": {
       "next_step": { "name": "Siguiente paso" },
@@ -53,10 +53,11 @@
     },
     "sensor": {
       "playlist_step_count": { "name": "Cantidad de pasos de la lista" },
+      "current_playlist": { "name": "Lista de reproducciA3n actual" },
       "current_playlist_step": { "name": "Paso actual de la lista" },
-      "next_scheduled_start": { "name": "Próximo inicio programado" },
-      "next_scheduled_playlist": { "name": "Próxima lista de reproducción programada" },
-      "xschedule_version": { "name": "Versión de xSchedule" }
+      "next_scheduled_start": { "name": "PrA3ximo inicio programado" },
+      "next_scheduled_playlist": { "name": "PrA3xima lista de reproducciA3n programada" },
+      "xschedule_version": { "name": "VersiA3n de xSchedule" }
     }
   }
 }

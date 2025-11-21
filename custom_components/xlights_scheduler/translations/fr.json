@@ -3,24 +3,24 @@
   "config": {
     "step": {
       "user": {
-        "title": "Se connecter à xSchedule",
+        "title": "Se connecter A� xSchedule",
         "data": {
-          "host": "Hôte/IP",
+          "host": "HA'te/IP",
           "port": "Port",
           "password": "Mot de passe (facultatif)"
         }
       }
     },
     "error": {
-      "cannot_connect": "Impossible de se connecter ou de s’authentifier"
+      "cannot_connect": "Impossible de se connecter ou de s�?Tauthentifier"
     },
     "options": {
       "step": {
         "init": {
           "data": {
-            "poll_interval_playing": "Intervalle d’interrogation (s) en lecture/pause",
-            "poll_interval_idle": "Intervalle d’interrogation (s) à l’arrêt",
-            "enable_browse_media": "Activer l’explorateur média",
+            "poll_interval_playing": "Intervalle d�?Tinterrogation (s) en lecture/pause",
+            "poll_interval_idle": "Intervalle d�?Tinterrogation (s) A� l�?TarrA�t",
+            "enable_browse_media": "Activer l�?Texplorateur mAcdia",
             "lists_refresh_secs": "Actualiser playlists/pas toutes les (s)"
           }
         }
@@ -32,30 +32,31 @@
       "xlights": { "name": "xLights Scheduler" }
     },
     "switch": {
-      "output_to_lights": { "name": "Sortie vers les lumières" },
+      "output_to_lights": { "name": "Sortie vers les lumiA\"res" },
       "playlist_loop": { "name": "Boucle de la playlist" },
       "test_mode": { "name": "Mode test" }
     },
     "number": {
-      "brightness": { "name": "Luminosité" }
+      "brightness": { "name": "LuminositAc" }
     },
     "select": {
       "playlist": { "name": "Playlist" },
-      "step": { "name": "Étape" },
+      "step": { "name": "A%tape" },
       "background_playlist": { "name": "Playlist de fond" }
     },
     "button": {
-      "next_step": { "name": "Étape suivante" },
-      "prior_step": { "name": "Étape précédente" },
-      "restart_step": { "name": "Recommencer l’étape" },
-      "stop_all_now": { "name": "Tout arrêter maintenant" },
+      "next_step": { "name": "A%tape suivante" },
+      "prior_step": { "name": "A%tape prAccAcdente" },
+      "restart_step": { "name": "Recommencer l�?TActape" },
+      "stop_all_now": { "name": "Tout arrA�ter maintenant" },
       "close_xschedule": { "name": "Fermer xSchedule" }
     },
     "sensor": {
-      "playlist_step_count": { "name": "Nombre d’étapes de la playlist" },
-      "current_playlist_step": { "name": "Étape actuelle de la playlist" },
-      "next_scheduled_start": { "name": "Prochain démarrage planifié" },
-      "next_scheduled_playlist": { "name": "Prochaine playlist planifiée" },
+      "playlist_step_count": { "name": "Nombre d�?TActapes de la playlist" },
+      "current_playlist": { "name": "Playlist actuelle" },
+      "current_playlist_step": { "name": "A%tape actuelle de la playlist" },
+      "next_scheduled_start": { "name": "Prochain dAcmarrage planifiAc" },
+      "next_scheduled_playlist": { "name": "Prochaine playlist planifiAce" },
       "xschedule_version": { "name": "Version de xSchedule" }
     }
   }

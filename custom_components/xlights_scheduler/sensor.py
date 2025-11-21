@@ -30,6 +30,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(
         [
             PlaylistStepCountSensor(hass, client, coordinator, entry),
+            CurrentPlaylistSensor(client, coordinator, entry),
             CurrentPlaylistStepSensor(client, coordinator, entry),
             NextScheduledSensor(client, coordinator, entry),
             NextScheduledPlaylistSensor(client, coordinator, entry),
@@ -102,6 +103,37 @@ class PlaylistStepCountSensor(CoordinatorEntity[XScheduleCoordinator], SensorEnt
             self._cache_ts = dt_util.utcnow()
             self.hass.async_create_task(self.async_update())
         self.async_write_ha_state()
+
+
+class CurrentPlaylistSensor(CoordinatorEntity[XScheduleCoordinator], SensorEntity):
+    _attr_has_entity_name = True
+    _attr_translation_key = "current_playlist"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:playlist-music"
+
+    def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._client = client
+        self._entry = entry
+        self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:sensor_current_playlist"
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"sensor.{DOMAIN}_{device_slug}_current_playlist"
+
+    @property
+    def device_info(self):
+        xs_ver = (self.coordinator.data or {}).get("version") if self.coordinator else None
+        return {
+            "identifiers": {(DOMAIN, f"{self._entry.data['host']}:{self._entry.data['port']}")},
+            "name": "xLights Scheduler",
+            "manufacturer": "xLights",
+            "model": "xSchedule",
+            "sw_version": xs_ver or INTEGRATION_VERSION,
+        }
+
+    @property
+    def native_value(self):
+        data = self.coordinator.data or {}
+        return data.get("playlist") or None
 
 
 class CurrentPlaylistStepSensor(CoordinatorEntity[XScheduleCoordinator], SensorEntity):

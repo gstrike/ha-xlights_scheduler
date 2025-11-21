@@ -45,7 +45,7 @@
       "background_playlist": { "name": "Hintergrund-Playlist" }
     },
     "button": {
-      "next_step": { "name": "Nächster Schritt" },
+      "next_step": { "name": "NAchster Schritt" },
       "prior_step": { "name": "Vorheriger Schritt" },
       "restart_step": { "name": "Schritt neu starten" },
       "stop_all_now": { "name": "Alles jetzt stoppen" },
@@ -53,9 +53,10 @@
     },
     "sensor": {
       "playlist_step_count": { "name": "Anzahl der Playlist-Schritte" },
+      "current_playlist": { "name": "Aktuelle Playlist" },
       "current_playlist_step": { "name": "Aktueller Playlist-Schritt" },
-      "next_scheduled_start": { "name": "Nächster geplanter Start" },
-      "next_scheduled_playlist": { "name": "Nächste geplante Playlist" },
+      "next_scheduled_start": { "name": "NAchster geplanter Start" },
+      "next_scheduled_playlist": { "name": "NAchste geplante Playlist" },
       "xschedule_version": { "name": "xSchedule-Version" }
     }
   }
