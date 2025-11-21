@@ -29,6 +29,7 @@
       "current_playlist": { "name": "Current playlist" },
       "current_playlist_step": { "name": "Current playlist step" },
       "next_scheduled_start": { "name": "Next scheduled start" },
+      "next_scheduled_start_minutes": { "name": "Next scheduled start (minutes)" },
       "next_scheduled_playlist": { "name": "Next scheduled playlist" },
       "xschedule_version": { "name": "xSchedule version" }
     }

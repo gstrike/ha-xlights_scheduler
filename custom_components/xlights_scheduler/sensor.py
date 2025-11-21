@@ -33,6 +33,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             CurrentPlaylistSensor(client, coordinator, entry),
             CurrentPlaylistStepSensor(client, coordinator, entry),
             NextScheduledSensor(client, coordinator, entry),
+            NextScheduledMinutesSensor(client, coordinator, entry),
             NextScheduledPlaylistSensor(client, coordinator, entry),
             XScheduleVersionSensor(client, coordinator, entry),
         ]
@@ -215,6 +216,60 @@ class NextScheduledSensor(CoordinatorEntity[XScheduleCoordinator], SensorEntity)
             "schedule": schedulename,
             "end": end,
         }
+        self.async_write_ha_state()
+
+
+class NextScheduledMinutesSensor(CoordinatorEntity[XScheduleCoordinator], SensorEntity):
+    _attr_has_entity_name = True
+    _attr_translation_key = "next_scheduled_start_minutes"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:timer-sand"
+
+    def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._client = client
+        self._entry = entry
+        self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:sensor_next_scheduled_minutes"
+        self._state: Any = None
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"sensor.{DOMAIN}_{device_slug}_next_scheduled_start_minutes"
+
+    @property
+    def device_info(self):
+        xs_ver = (self.coordinator.data or {}).get("version") if self.coordinator else None
+        return {
+            "identifiers": {(DOMAIN, f"{self._entry.data['host']}:{self._entry.data['port']}")},
+            "name": "xLights Scheduler",
+            "manufacturer": "xLights",
+            "model": "xSchedule",
+            "sw_version": xs_ver or INTEGRATION_VERSION,
+        }
+
+    @property
+    def native_value(self):
+        return self._state
+
+    def _handle_coordinator_update(self) -> None:
+        from homeassistant.util import dt as dt_util
+
+        js = (self.coordinator.data or {}).get("_next_scheduled") or {}
+        start = js.get("start")
+
+        if not start:
+            self._state = None
+        else:
+            try:
+                dt_start = dt_util.parse_datetime(start)
+                if dt_start is None:
+                    self._state = None
+                else:
+                    dt_start = dt_util.as_utc(dt_start)
+                    now = dt_util.utcnow()
+                    minutes = (dt_start - now).total_seconds() / 60.0
+                    self._state = round(minutes)
+            except Exception:
+                self._state = None
+
         self.async_write_ha_state()
 
 

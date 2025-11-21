@@ -56,6 +56,7 @@
       "current_playlist": { "name": "Lista de reproducciA3n actual" },
       "current_playlist_step": { "name": "Paso actual de la lista" },
       "next_scheduled_start": { "name": "PrA3ximo inicio programado" },
+      "next_scheduled_start_minutes": { "name": "PrA3ximo inicio programado (minutos)" },
       "next_scheduled_playlist": { "name": "PrA3xima lista de reproducciA3n programada" },
       "xschedule_version": { "name": "VersiA3n de xSchedule" }
     }
