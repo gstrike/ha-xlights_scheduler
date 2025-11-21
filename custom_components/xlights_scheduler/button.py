@@ -9,7 +9,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .client import XScheduleClient
 from .coordinator import XScheduleCoordinator
-from .const import DOMAIN, INTEGRATION_VERSION
+from .const import DOMAIN, INTEGRATION_VERSION, slugify_entry_title
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +53,11 @@ class NextStepButton(BaseXScheduleButton):
     _attr_translation_key = "next_step"
     _attr_icon = "mdi:skip-next"
 
+    def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(client, coordinator, entry)
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"button.{DOMAIN}_{device_slug}_next_step"
+
     @property
     def unique_id(self) -> str:
         return f"{self._entry.data['host']}:{self._entry.data['port']}:button_next"
@@ -66,6 +71,11 @@ class PriorStepButton(BaseXScheduleButton):
     _attr_has_entity_name = True
     _attr_translation_key = "prior_step"
     _attr_icon = "mdi:skip-previous"
+
+    def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(client, coordinator, entry)
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"button.{DOMAIN}_{device_slug}_prior_step"
 
     @property
     def unique_id(self) -> str:
@@ -81,6 +91,11 @@ class RestartStepButton(BaseXScheduleButton):
     _attr_translation_key = "restart_step"
     _attr_icon = "mdi:restart"
 
+    def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(client, coordinator, entry)
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"button.{DOMAIN}_{device_slug}_restart_step"
+
     @property
     def unique_id(self) -> str:
         return f"{self._entry.data['host']}:{self._entry.data['port']}:button_restart_step"
@@ -95,6 +110,11 @@ class StopAllNowButton(BaseXScheduleButton):
     _attr_translation_key = "stop_all_now"
     _attr_icon = "mdi:stop-circle"
 
+    def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(client, coordinator, entry)
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"button.{DOMAIN}_{device_slug}_stop_all_now"
+
     @property
     def unique_id(self) -> str:
         return f"{self._entry.data['host']}:{self._entry.data['port']}:button_stop_all_now"
@@ -108,6 +128,11 @@ class CloseXScheduleButton(BaseXScheduleButton):
     _attr_has_entity_name = True
     _attr_translation_key = "close_xschedule"
     _attr_icon = "mdi:close-circle"
+
+    def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(client, coordinator, entry)
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"button.{DOMAIN}_{device_slug}_close_xschedule"
 
     @property
     def unique_id(self) -> str:

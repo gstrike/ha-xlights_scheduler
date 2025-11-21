@@ -17,7 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .client import XScheduleClient
 from .coordinator import XScheduleCoordinator
-from .const import DOMAIN, INTEGRATION_VERSION
+from .const import DOMAIN, INTEGRATION_VERSION, slugify_entry_title
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,6 +39,9 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
         self._client = client
         self._entry = entry
         self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:media_player"
+        device_slug = slugify_entry_title(entry)
+        # media_player.xlights_scheduler_<user_device_name>_xlights
+        self.entity_id = f"media_player.{DOMAIN}_{device_slug}_xlights"
         self._last_volume_pct: int | None = None
         self._last_playlist: str | None = None
         self._attr_supported_features = (

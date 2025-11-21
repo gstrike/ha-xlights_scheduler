@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .client import XScheduleClient
 from .coordinator import XScheduleCoordinator
-from .const import DOMAIN, INTEGRATION_VERSION
+from .const import DOMAIN, INTEGRATION_VERSION, slugify_entry_title
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,6 +41,8 @@ class PlaylistSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
         self._client = client
         self._entry = entry
         self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:select_playlist"
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"select.{DOMAIN}_{device_slug}_playlist"
 
     @property
     def device_info(self):
@@ -85,6 +87,8 @@ class StepSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
         self._client = client
         self._entry = entry
         self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:select_step"
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"select.{DOMAIN}_{device_slug}_step"
         self._cached_steps: dict[str, list[str]] = {}
         self._last_playlist: str | None = None
         self._steps_cache_ts: dict[str, Any] = {}
@@ -176,6 +180,8 @@ class BackgroundPlaylistSelect(CoordinatorEntity[XScheduleCoordinator], SelectEn
         self._client = client
         self._entry = entry
         self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:select_background_playlist"
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"select.{DOMAIN}_{device_slug}_background_playlist"
 
     @property
     def device_info(self):

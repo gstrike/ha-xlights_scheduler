@@ -11,7 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .client import XScheduleClient
 from .coordinator import XScheduleCoordinator
-from .const import DOMAIN, INTEGRATION_VERSION
+from .const import DOMAIN, INTEGRATION_VERSION, slugify_entry_title
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +38,8 @@ class BrightnessNumber(CoordinatorEntity[XScheduleCoordinator], NumberEntity):
         self._client = client
         self._entry = entry
         self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:number_brightness"
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"number.{DOMAIN}_{device_slug}_brightness"
 
     @property
     def device_info(self):

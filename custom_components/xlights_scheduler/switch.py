@@ -17,6 +17,7 @@ from .const import (
     INTEGRATION_VERSION,
     EVENT_TEST_MODE_STARTED,
     EVENT_TEST_MODE_STOPPED,
+    slugify_entry_title,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,6 +47,8 @@ class OutputToLightsSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity
         self._client = client
         self._entry = entry
         self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:switch_output_to_lights"
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"switch.{DOMAIN}_{device_slug}_output_to_lights"
     
     @property
     def device_info(self):
@@ -84,6 +87,8 @@ class PlaylistLoopSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity):
         self._client = client
         self._entry = entry
         self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:switch_playlist_loop"
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"switch.{DOMAIN}_{device_slug}_playlist_loop"
     
     @property
     def device_info(self):
@@ -98,8 +103,9 @@ class PlaylistLoopSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity):
 
     @property
     def available(self) -> bool:
-        data = self.coordinator.data or {}
-        return data.get("status") in ("playing", "paused")
+        # Expose the playlist loop control even when idle so users
+        # can preconfigure loop state for the next playback.
+        return True
 
     @property
     def is_on(self) -> bool:
@@ -128,6 +134,8 @@ class TestModeSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity):
         self._client = client
         self._entry = entry
         self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:switch_test_mode"
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"switch.{DOMAIN}_{device_slug}_test_mode"
 
     @property
     def device_info(self):

@@ -17,7 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .client import XScheduleClient
 from .coordinator import XScheduleCoordinator
-from .const import DOMAIN, INTEGRATION_VERSION
+from .const import DOMAIN, INTEGRATION_VERSION, slugify_entry_title
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,6 +50,8 @@ class PlaylistStepCountSensor(CoordinatorEntity[XScheduleCoordinator], SensorEnt
         self._client = client
         self._entry = entry
         self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:sensor_playlist_step_count"
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"sensor.{DOMAIN}_{device_slug}_playlist_step_count"
         self._count: int = 0
         self._last_playlist: str | None = None
         self._cache_ts: Any = None
@@ -113,6 +115,8 @@ class CurrentPlaylistStepSensor(CoordinatorEntity[XScheduleCoordinator], SensorE
         self._client = client
         self._entry = entry
         self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:sensor_current_playlist_step"
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"sensor.{DOMAIN}_{device_slug}_current_playlist_step"
 
     @property
     def device_info(self):
@@ -144,6 +148,8 @@ class NextScheduledSensor(CoordinatorEntity[XScheduleCoordinator], SensorEntity)
         self._attr_icon = "mdi:calendar-clock"
         self._state: Any = None
         self._attrs: dict[str, Any] = {}
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"sensor.{DOMAIN}_{device_slug}_next_scheduled_start"
 
     @property
     def device_info(self):
@@ -193,6 +199,8 @@ class NextScheduledPlaylistSensor(CoordinatorEntity[XScheduleCoordinator], Senso
         self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:sensor_next_scheduled_playlist"
         self._state: Any = None
         self._attrs: dict[str, Any] = {}
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"sensor.{DOMAIN}_{device_slug}_next_scheduled_playlist"
 
     @property
     def device_info(self):
@@ -244,6 +252,8 @@ class XScheduleVersionSensor(CoordinatorEntity[XScheduleCoordinator], SensorEnti
         self._entry = entry
         self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:sensor_xschedule_version"
         self._attr_icon = "mdi:information-outline"
+        device_slug = slugify_entry_title(entry)
+        self.entity_id = f"sensor.{DOMAIN}_{device_slug}_xschedule_version"
 
     @property
     def device_info(self):
