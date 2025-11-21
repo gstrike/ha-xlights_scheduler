@@ -49,6 +49,8 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
             CONF_LISTS_REFRESH_SECS, DEFAULT_LISTS_REFRESH_SECS
         )
         self._last_schedule_id: str | None = None
+        self._last_schedule_name: str | None = None
+        self._last_schedule_end: str | None = None
         self._last_version: str | None = None
         self._last_status: str | None = None
         self._last_playlist: str | None = None
@@ -139,10 +141,15 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                     "playlistid": status.get("playlistid"),
                     "playlist": status.get("playlist"),
                     "scheduleend": status.get("scheduleend"),
-                    "trigger": status.get("trigger"),
                     "device": f"{DOMAIN}:{id(self)}",
+                    "host": self.client.host,
+                    "port": self.client.port,
+                    "base_url": self.client.base_url,
                 },
             )
+            # Remember schedule context for matching ended event
+            self._last_schedule_name = status.get("schedulename")
+            self._last_schedule_end = status.get("scheduleend")
 
         if self._last_schedule_id and not cur_sched_id:
             # schedule ended
@@ -150,8 +157,18 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                 EVENT_SCHEDULE_ENDED,
                 {
                     "scheduleid": self._last_schedule_id,
+                    "schedulename": self._last_schedule_name,
+                    "scheduleend": self._last_schedule_end,
+                    "playlistid": self._last_playlist_id,
+                    "playlist": self._last_playlist,
+                    "device": f"{DOMAIN}:{id(self)}",
+                    "host": self.client.host,
+                    "port": self.client.port,
+                    "base_url": self.client.base_url,
                 },
             )
+            self._last_schedule_name = None
+            self._last_schedule_end = None
 
         self._last_schedule_id = cur_sched_id
 

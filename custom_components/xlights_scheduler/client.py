@@ -33,6 +33,14 @@ class XScheduleClient:
         return self._base
 
     @property
+    def host(self) -> str:
+        return self._host
+
+    @property
+    def port(self) -> int:
+        return self._port
+
+    @property
     def server_seen_ip(self) -> Optional[str]:
         return self._server_seen_ip
 
