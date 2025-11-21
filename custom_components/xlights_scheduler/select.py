@@ -67,8 +67,10 @@ class PlaylistSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
         return data.get("playlist")
 
     async def async_select_option(self, option: str) -> None:
-        self.hass.data[DOMAIN][self._entry.entry_id]["selected_playlist"] = option
-        await self._client.play_playlist(option)
+        store = self.hass.data[DOMAIN][self._entry.entry_id]
+        store["selected_playlist"] = option
+        # Clearing any queued step avoids an inconsistent combination
+        store.pop("selected_step", None)
         await self.coordinator.async_request_refresh()
 
 
@@ -155,6 +157,9 @@ class StepSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
         pl = self._get_active_playlist()
         if not pl:
             return
+        store = self.hass.data[DOMAIN][self._entry.entry_id]
+        store["selected_playlist"] = pl
+        store["selected_step"] = option
         await self._client.command("Play playlist step", parameters=f"{pl},{option}")
         await self.coordinator.async_request_refresh()
 

@@ -133,7 +133,12 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
         return [pl.get("name") for pl in playlists if pl.get("name")]
 
     async def async_select_source(self, source: str) -> None:
-        await self._client.play_playlist(source)
+        # Treat source selection as queueing the playlist; user presses Play to start
+        hass = self.hass
+        if hass and DOMAIN in hass.data and self._entry.entry_id in hass.data[DOMAIN]:
+            store = hass.data[DOMAIN][self._entry.entry_id]
+            store["selected_playlist"] = source
+            store.pop("selected_step", None)
         await self.coordinator.async_request_refresh()
 
     async def async_set_volume_level(self, volume: float) -> None:
@@ -158,21 +163,54 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
         await self.coordinator.async_request_refresh()
 
     async def async_media_play(self) -> None:
+        store = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
+        selected_playlist = None
+        selected_step = None
+        if isinstance(store, dict):
+            selected_playlist = store.get("selected_playlist")
+            selected_step = store.get("selected_step")
+
+        data = self.coordinator.data or {}
+        current_playlist = data.get("playlist")
+
+        # If paused, prefer starting a newly selected playlist (or step) over resuming
         if self.state == "paused":
+            if selected_playlist and selected_playlist != current_playlist:
+                playlist = selected_playlist
+                if selected_step:
+                    await self._client.command("Play playlist step", parameters=f"{playlist},{selected_step}")
+                    if isinstance(store, dict):
+                        store.pop("selected_step", None)
+                else:
+                    await self._client.play_playlist(playlist)
+                await self.coordinator.async_request_refresh()
+                return
+
+            # No new playlist queued; just resume current playback
             await self._client.pause_toggle()
             await self.coordinator.async_request_refresh()
             return
 
-        # If idle, try to start a playlist: preferred selected playlist, then last known, then first available
-        sel = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id, {}).get("selected_playlist")
-        playlist = sel or self._last_playlist
+        # If idle (or explicitly triggered while playing), try to start queued playlist/step:
+        # preferred queued playlist/step, then last known playlist, then first available
+
+        playlist = selected_playlist or self._last_playlist
         if not playlist:
             playlists = (self.coordinator.data or {}).get("_playlists") or []
             if playlists:
                 playlist = playlists[0].get("name")
-        if playlist:
+
+        if not playlist:
+            return
+
+        if selected_step:
+            await self._client.command("Play playlist step", parameters=f"{playlist},{selected_step}")
+            if isinstance(store, dict):
+                store.pop("selected_step", None)
+        else:
             await self._client.play_playlist(playlist)
-            await self.coordinator.async_request_refresh()
+
+        await self.coordinator.async_request_refresh()
 
     async def async_media_stop(self) -> None:
         # Use Stop all now per requested behavior
