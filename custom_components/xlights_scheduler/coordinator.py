@@ -59,6 +59,9 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         self._last_output: bool | None = None
         self._last_playlist_loop: bool | None = None
 
+        self._last_next_scheduled: Dict[str, Any] | None = None
+        self._last_next_scheduled_ts: dt.datetime | None = None
+
     def _apply_interval_for_status(self, status: str) -> None:
         playing = status in ("playing", "paused")
         seconds = (
@@ -73,6 +76,75 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
             setter(interval)
         else:
             self.update_interval = interval
+
+    async def _async_compute_next_scheduled(self) -> Dict[str, Any] | None:
+        now = dt_util.utcnow()
+        if (
+            self._last_next_scheduled is not None
+            and self._last_next_scheduled_ts is not None
+            and (now - self._last_next_scheduled_ts).total_seconds() <= self._lists_refresh_secs
+        ):
+            return self._last_next_scheduled
+
+        playlists = self._last_playlists or []
+        best: Dict[str, Any] | None = None
+        best_start: dt.datetime | None = None
+
+        for pl in playlists:
+            name = pl.get("name")
+            if not name:
+                continue
+            try:
+                js = await self.client.query("GetPlayListSchedules", parameters=name)
+            except Exception:
+                continue
+            schedules = js.get("schedules") or []
+            for sch in schedules:
+                enabled = str(sch.get("enabled", "")).upper()
+                active = str(sch.get("active", "")).upper()
+                if enabled != "TRUE" or active == "TRUE":
+                    continue
+                next_active = str(sch.get("nextactive") or "").strip()
+                if not next_active:
+                    continue
+                na_upper = next_active.upper()
+                if na_upper in ("NEVER", "NOW!", "DONE") or "LONG TIME" in na_upper:
+                    continue
+                try:
+                    dt_start = dt_util.parse_datetime(next_active)
+                except Exception:
+                    dt_start = None
+                if dt_start is None:
+                    continue
+                dt_start = dt_util.as_utc(dt_start)
+                if dt_start <= now:
+                    continue
+                if best_start is None or dt_start < best_start:
+                    best_start = dt_start
+                    best = {
+                        "playlistname": name,
+                        "playlistid": pl.get("id"),
+                        "schedulename": sch.get("name"),
+                        "scheduleid": sch.get("id"),
+                        "start": next_active,
+                        "end": sch.get("scheduleend") or "",
+                    }
+
+        if best is None:
+            result: Dict[str, Any] = {
+                "playlistname": "",
+                "playlistid": "",
+                "schedulename": "",
+                "scheduleid": "",
+                "start": "Never",
+                "end": "",
+            }
+        else:
+            result = best
+
+        self._last_next_scheduled = result
+        self._last_next_scheduled_ts = now
+        return result
 
     async def _async_update_data(self) -> Dict[str, Any]:
         try:
@@ -93,6 +165,8 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         if ver and ver != self._last_version:
             self._last_playlists_ts = None
             self._last_version = ver
+            self._last_next_scheduled = None
+            self._last_next_scheduled_ts = None
             self.hass.bus.async_fire(
                 EVENT_VERSION_CHANGED,
                 {
@@ -111,6 +185,8 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
             try:
                 self._last_playlists = await self.client.get_playlists()
                 self._last_playlists_ts = now
+                self._last_next_scheduled = None
+                self._last_next_scheduled_ts = None
             except Exception:
                 pass
 
@@ -118,9 +194,8 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         # Stamp the time this payload was fetched so entities can animate progress
         status["_ts"] = dt_util.utcnow()
 
-        # Fetch next scheduled playlist info (lightweight single query)
         try:
-            next_sched = await self.client.query("GetNextScheduledPlayList")
+            next_sched = await self._async_compute_next_scheduled()
             status["_next_scheduled"] = next_sched
         except Exception:
             status["_next_scheduled"] = None
