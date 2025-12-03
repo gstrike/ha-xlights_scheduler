@@ -13,6 +13,10 @@ Control and monitor xSchedule (aka xLights Scheduler, part of xLights) from Home
 
 > This is a custom integration. Place this folder at `config/custom_components/xlights_scheduler` in your HA config.
 
+Or easily install using this handy dandy button:
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gstrike&repository=https%3A%2F%2Fgithub.com%2Fgstrike%2Fha-xlights_scheduler&category=integration)
+
 ## Installation
 
 1. Copy the `xlights_scheduler` folder into your Home Assistant config:
