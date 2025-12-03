@@ -47,16 +47,16 @@
     },
     "error": {
       "cannot_connect": "Cannot connect or authenticate"
-    },
-    "options": {
-      "step": {
-        "init": {
-          "data": {
-            "poll_interval_playing": "Polling interval (s) when playing/paused",
-            "poll_interval_idle": "Polling interval (s) when idle",
-            "enable_browse_media": "Enable Browse Media",
-            "lists_refresh_secs": "Refresh playlists/steps every (s)"
-          }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "poll_interval_playing": "Polling interval (s) when playing/paused",
+          "poll_interval_idle": "Polling interval (s) when idle",
+          "enable_browse_media": "Enable Browse Media",
+          "lists_refresh_secs": "Refresh playlists/steps every (s)"
         }
       }
     }

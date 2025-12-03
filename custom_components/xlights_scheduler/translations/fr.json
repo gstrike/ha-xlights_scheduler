@@ -1,64 +1,64 @@
 {
   "title": "xLights Scheduler",
+  "entity": {
+    "media_player": {
+      "xlights": { "name": "xLights Scheduler" }
+    },
+    "switch": {
+      "output_to_lights": { "name": "Sortie vers les lumieres" },
+      "playlist_loop": { "name": "Boucle de la playlist" },
+      "test_mode": { "name": "Mode test" }
+    },
+    "number": {
+      "brightness": { "name": "Luminosite" }
+    },
+    "select": {
+      "playlist": { "name": "Playlist" },
+      "step": { "name": "Etape" },
+      "background_playlist": { "name": "Playlist de fond" }
+    },
+    "button": {
+      "next_step": { "name": "Etape suivante" },
+      "prior_step": { "name": "Etape precedente" },
+      "restart_step": { "name": "Recommencer l'etape" },
+      "stop_all_now": { "name": "Tout arreter maintenant" },
+      "close_xschedule": { "name": "Fermer xSchedule" }
+    },
+    "sensor": {
+      "playlist_step_count": { "name": "Nombre d'etapes de la playlist" },
+      "current_playlist": { "name": "Playlist actuelle" },
+      "current_playlist_step": { "name": "Etape actuelle de la playlist" },
+      "next_scheduled_start": { "name": "Prochain demarrage planifie" },
+      "next_scheduled_start_minutes": { "name": "Prochain demarrage planifie (minutes)" },
+      "next_scheduled_playlist": { "name": "Prochaine playlist planifiee" },
+      "xschedule_version": { "name": "Version de xSchedule" }
+    }
+  },
   "config": {
     "step": {
       "user": {
-        "title": "Se connecter A��� xSchedule",
+        "title": "Se connecter a xSchedule",
         "data": {
-          "host": "HA'te/IP",
+          "host": "Hote/IP",
           "port": "Port",
           "password": "Mot de passe (facultatif)"
         }
       }
     },
     "error": {
-      "cannot_connect": "Impossible de se connecter ou de s���?Tauthentifier"
-    },
-    "options": {
-      "step": {
-        "init": {
-          "data": {
-            "poll_interval_playing": "Intervalle d���?Tinterrogation (s) en lecture/pause",
-            "poll_interval_idle": "Intervalle d���?Tinterrogation (s) A��� l���?TarrA���t",
-            "enable_browse_media": "Activer l���?Texplorateur mAcdia",
-            "lists_refresh_secs": "Actualiser playlists/pas toutes les (s)"
-          }
-        }
-      }
+      "cannot_connect": "Impossible de se connecter ou de s'authentifier"
     }
   },
-  "entity": {
-    "media_player": {
-      "xlights": { "name": "xLights Scheduler" }
-    },
-    "switch": {
-      "output_to_lights": { "name": "Sortie vers les lumiA\"res" },
-      "playlist_loop": { "name": "Boucle de la playlist" },
-      "test_mode": { "name": "Mode test" }
-    },
-    "number": {
-      "brightness": { "name": "LuminositAc" }
-    },
-    "select": {
-      "playlist": { "name": "Playlist" },
-      "step": { "name": "A%tape" },
-      "background_playlist": { "name": "Playlist de fond" }
-    },
-    "button": {
-      "next_step": { "name": "A%tape suivante" },
-      "prior_step": { "name": "A%tape prAccAcdente" },
-      "restart_step": { "name": "Recommencer l���?TActape" },
-      "stop_all_now": { "name": "Tout arrA���ter maintenant" },
-      "close_xschedule": { "name": "Fermer xSchedule" }
-    },
-    "sensor": {
-      "playlist_step_count": { "name": "Nombre d���?TActapes de la playlist" },
-      "current_playlist": { "name": "Playlist actuelle" },
-      "current_playlist_step": { "name": "A%tape actuelle de la playlist" },
-      "next_scheduled_start": { "name": "Prochain dAcmarrage planifiAc" },
-      "next_scheduled_start_minutes": { "name": "Prochain dAcmarrage planifiAc (minutes)" },
-      "next_scheduled_playlist": { "name": "Prochaine playlist planifiAce" },
-      "xschedule_version": { "name": "Version de xSchedule" }
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "poll_interval_playing": "Intervalle d'interrogation (s) en lecture/pause",
+          "poll_interval_idle": "Intervalle d'interrogation (s) a l'arret",
+          "enable_browse_media": "Activer l'explorateur media",
+          "lists_refresh_secs": "Actualiser playlists/pas toutes les (s)"
+        }
+      }
     }
   }
 }

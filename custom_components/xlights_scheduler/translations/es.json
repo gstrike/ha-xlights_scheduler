@@ -1,48 +1,21 @@
 {
   "title": "xLights Scheduler",
-  "config": {
-    "step": {
-      "user": {
-        "title": "Conectar a xSchedule",
-        "data": {
-          "host": "Host/IP",
-          "port": "Puerto",
-          "password": "ContraseA�a (opcional)"
-        }
-      }
-    },
-    "error": {
-      "cannot_connect": "No se puede conectar o autenticar"
-    },
-    "options": {
-      "step": {
-        "init": {
-          "data": {
-            "poll_interval_playing": "Intervalo de sondeo (s) en reproducciA3n/pausa",
-            "poll_interval_idle": "Intervalo de sondeo (s) en inactividad",
-            "enable_browse_media": "Habilitar explorador de medios",
-            "lists_refresh_secs": "Actualizar listas/pasos cada (s)"
-          }
-        }
-      }
-    }
-  },
   "entity": {
     "media_player": {
       "xlights": { "name": "xLights Scheduler" }
     },
     "switch": {
       "output_to_lights": { "name": "Salida a luces" },
-      "playlist_loop": { "name": "Bucle de lista de reproducciA3n" },
+      "playlist_loop": { "name": "Bucle de lista de reproduccion" },
       "test_mode": { "name": "Modo de prueba" }
     },
     "number": {
       "brightness": { "name": "Brillo" }
     },
     "select": {
-      "playlist": { "name": "Lista de reproducciA3n" },
+      "playlist": { "name": "Lista de reproduccion" },
       "step": { "name": "Paso" },
-      "background_playlist": { "name": "Lista de reproducciA3n de fondo" }
+      "background_playlist": { "name": "Lista de reproduccion de fondo" }
     },
     "button": {
       "next_step": { "name": "Siguiente paso" },
@@ -53,12 +26,39 @@
     },
     "sensor": {
       "playlist_step_count": { "name": "Cantidad de pasos de la lista" },
-      "current_playlist": { "name": "Lista de reproducciA3n actual" },
+      "current_playlist": { "name": "Lista de reproduccion actual" },
       "current_playlist_step": { "name": "Paso actual de la lista" },
-      "next_scheduled_start": { "name": "PrA3ximo inicio programado" },
-      "next_scheduled_start_minutes": { "name": "PrA3ximo inicio programado (minutos)" },
-      "next_scheduled_playlist": { "name": "PrA3xima lista de reproducciA3n programada" },
-      "xschedule_version": { "name": "VersiA3n de xSchedule" }
+      "next_scheduled_start": { "name": "Proximo inicio programado" },
+      "next_scheduled_start_minutes": { "name": "Proximo inicio programado (minutos)" },
+      "next_scheduled_playlist": { "name": "Proxima lista de reproduccion programada" },
+      "xschedule_version": { "name": "Version de xSchedule" }
+    }
+  },
+  "config": {
+    "step": {
+      "user": {
+        "title": "Conectar a xSchedule",
+        "data": {
+          "host": "Host/IP",
+          "port": "Puerto",
+          "password": "Contrasena (opcional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "No se puede conectar o autenticar"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "poll_interval_playing": "Intervalo de sondeo (s) en reproduccion/pausa",
+          "poll_interval_idle": "Intervalo de sondeo (s) en inactividad",
+          "enable_browse_media": "Habilitar explorador de medios",
+          "lists_refresh_secs": "Actualizar listas/pasos cada (s)"
+        }
+      }
     }
   }
 }

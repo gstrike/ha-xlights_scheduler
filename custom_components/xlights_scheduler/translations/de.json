@@ -1,32 +1,5 @@
 {
   "title": "xLights Scheduler",
-  "config": {
-    "step": {
-      "user": {
-        "title": "Mit xSchedule verbinden",
-        "data": {
-          "host": "Host/IP",
-          "port": "Port",
-          "password": "Passwort (optional)"
-        }
-      }
-    },
-    "error": {
-      "cannot_connect": "Verbindung oder Authentifizierung fehlgeschlagen"
-    },
-    "options": {
-      "step": {
-        "init": {
-          "data": {
-            "poll_interval_playing": "Abfrageintervall (s) bei Wiedergabe/Pause",
-            "poll_interval_idle": "Abfrageintervall (s) im Leerlauf",
-            "enable_browse_media": "Medienbrowser aktivieren",
-            "lists_refresh_secs": "Playlist/Schritte alle (s) aktualisieren"
-          }
-        }
-      }
-    }
-  },
   "entity": {
     "media_player": {
       "xlights": { "name": "xLights Scheduler" }
@@ -45,7 +18,7 @@
       "background_playlist": { "name": "Hintergrund-Playlist" }
     },
     "button": {
-      "next_step": { "name": "NAchster Schritt" },
+      "next_step": { "name": "Naechster Schritt" },
       "prior_step": { "name": "Vorheriger Schritt" },
       "restart_step": { "name": "Schritt neu starten" },
       "stop_all_now": { "name": "Alles jetzt stoppen" },
@@ -55,10 +28,37 @@
       "playlist_step_count": { "name": "Anzahl der Playlist-Schritte" },
       "current_playlist": { "name": "Aktuelle Playlist" },
       "current_playlist_step": { "name": "Aktueller Playlist-Schritt" },
-      "next_scheduled_start": { "name": "NAchster geplanter Start" },
-      "next_scheduled_start_minutes": { "name": "NAchster geplanter Start (Minuten)" },
-      "next_scheduled_playlist": { "name": "NAchste geplante Playlist" },
+      "next_scheduled_start": { "name": "Naechster geplanter Start" },
+      "next_scheduled_start_minutes": { "name": "Naechster geplanter Start (Minuten)" },
+      "next_scheduled_playlist": { "name": "Naechste geplante Playlist" },
       "xschedule_version": { "name": "xSchedule-Version" }
+    }
+  },
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit xSchedule verbinden",
+        "data": {
+          "host": "Host/IP",
+          "port": "Port",
+          "password": "Passwort (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung oder Authentifizierung fehlgeschlagen"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "poll_interval_playing": "Abfrageintervall (s) bei Wiedergabe/Pause",
+          "poll_interval_idle": "Abfrageintervall (s) im Leerlauf",
+          "enable_browse_media": "Medienbrowser aktivieren",
+          "lists_refresh_secs": "Playlist/Schritte alle (s) aktualisieren"
+        }
+      }
     }
   }
 }
