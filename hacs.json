@@ -1,4 +1,6 @@
 {
   "name": "xLights Scheduler",
-  "homeassistant": "2025.11.3"
+  "homeassistant": "2025.11.3",
+  "zip_release": true,
+  "filename": "xlights_scheduler.zip"
 }
