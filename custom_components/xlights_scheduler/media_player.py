@@ -15,6 +15,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from homeassistant.exceptions import HomeAssistantError
+from .const import player_key, CONF_ENABLE_BROWSE, DEFAULT_ENABLE_BROWSE
 from .client import XScheduleClient
 from .coordinator import XScheduleCoordinator
 from .const import DOMAIN, INTEGRATION_VERSION, slugify_entry_title
@@ -22,7 +24,9 @@ from .const import DOMAIN, INTEGRATION_VERSION, slugify_entry_title
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
     data = hass.data[DOMAIN][entry.entry_id]
     client: XScheduleClient = data["client"]
     coordinator: XScheduleCoordinator = data["coordinator"]
@@ -34,11 +38,16 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
     _attr_has_entity_name = True
     _attr_translation_key = "xlights"
 
-    def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        client: XScheduleClient,
+        coordinator: XScheduleCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
         super().__init__(coordinator)
         self._client = client
         self._entry = entry
-        self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:media_player"
+        self._attr_unique_id = f"{player_key(entry)}:media_player"
         device_slug = slugify_entry_title(entry)
         # media_player.xlights_scheduler_<user_device_name>_xlights
         self.entity_id = f"media_player.{DOMAIN}_{device_slug}_xlights"
@@ -53,16 +62,24 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
             | MediaPlayerEntityFeature.VOLUME_SET
             | MediaPlayerEntityFeature.VOLUME_MUTE
             | MediaPlayerEntityFeature.SEEK
-            | MediaPlayerEntityFeature.BROWSE_MEDIA
             | MediaPlayerEntityFeature.PLAY_MEDIA
             | MediaPlayerEntityFeature.SELECT_SOURCE
         )
 
     @property
+    def supported_features(self):
+        features = self._attr_supported_features
+        if self._entry.options.get(CONF_ENABLE_BROWSE, DEFAULT_ENABLE_BROWSE):
+            features |= MediaPlayerEntityFeature.BROWSE_MEDIA
+        return features
+
+    @property
     def device_info(self):
-        xs_ver = (self.coordinator.data or {}).get("version") if self.coordinator else None
+        xs_ver = (
+            (self.coordinator.data or {}).get("version") if self.coordinator else None
+        )
         return {
-            "identifiers": {(DOMAIN, f"{self._entry.data['host']}:{self._entry.data['port']}")},
+            "identifiers": {(DOMAIN, f"{player_key(self._entry)}")},
             "name": "xLights Scheduler",
             "manufacturer": "xLights",
             "model": "xSchedule",
@@ -102,7 +119,7 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
     def media_duration(self) -> Optional[int]:
         data = self.coordinator.data or {}
         try:
-            return int(data.get("lengthms", 0)) // 1000
+            return int(data.get("lengthms", 0)) / 1000
         except Exception:
             return None
 
@@ -110,9 +127,22 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
     def media_position(self) -> Optional[int]:
         data = self.coordinator.data or {}
         try:
-            return int(data.get("positionms", 0)) // 1000
+            return int(data.get("positionms", 0)) / 1000
         except Exception:
             return None
+
+    @property
+    def extra_state_attributes(self):
+        data = self.coordinator.data or {}
+        return {
+            "config_entry_id": self._entry.entry_id,
+            "playback_source": data.get("trigger", "idle"),
+            "playlist_id": data.get("playlistid"),
+            "step_id": data.get("stepid"),
+            "schedule_id": data.get("scheduleid"),
+            "schedule": data.get("schedulename"),
+            "list_refresh_error": data.get("_lists_error"),
+        }
 
     @property
     def media_title(self) -> Optional[str]:
@@ -130,7 +160,9 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
 
     @property
     def source_list(self) -> Optional[list[str]]:
-        playlists = self.coordinator.data.get("_playlists") if self.coordinator.data else None
+        playlists = (
+            self.coordinator.data.get("_playlists") if self.coordinator.data else None
+        )
         if not playlists:
             return None
         return [pl.get("name") for pl in playlists if pl.get("name")]
@@ -162,10 +194,18 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
         await self.coordinator.async_request_refresh()
 
     async def async_media_pause(self) -> None:
-        await self._client.pause_toggle()
-        await self.coordinator.async_request_refresh()
+        async with self._client.control_lock:
+            status = await self._client.get_playing_status()
+            if status.get("status") == "playing":
+                await self._client.pause_toggle()
+            await self.coordinator.async_request_refresh()
 
     async def async_media_play(self) -> None:
+        async with self._client.control_lock:
+            status = await self._client.get_playing_status()
+            await self._async_media_play(status)
+
+    async def _async_media_play(self, data: dict[str, Any]) -> None:
         store = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
         selected_playlist = None
         selected_step = None
@@ -173,15 +213,17 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
             selected_playlist = store.get("selected_playlist")
             selected_step = store.get("selected_step")
 
-        data = self.coordinator.data or {}
         current_playlist = data.get("playlist")
 
+        if data.get("status") == "playing":
+            return
+
         # If paused, prefer starting a newly selected playlist (or step) over resuming
-        if self.state == "paused":
+        if data.get("status") == "paused":
             if selected_playlist and selected_playlist != current_playlist:
                 playlist = selected_playlist
                 if selected_step:
-                    await self._client.command("Play playlist step", parameters=f"{playlist},{selected_step}")
+                    await self._client.play_step(playlist, selected_step)
                     if isinstance(store, dict):
                         store.pop("selected_step", None)
                 else:
@@ -190,11 +232,13 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
                 return
 
             # No new playlist queued; just resume current playback
-            await self._client.pause_toggle()
+            status = await self._client.get_playing_status()
+            if status.get("status") == "paused":
+                await self._client.pause_toggle()
             await self.coordinator.async_request_refresh()
             return
 
-        # If idle (or explicitly triggered while playing), try to start queued playlist/step:
+        # If idle, try to start the selected playlist/step:
         # preferred queued playlist/step, then last known playlist, then first available
 
         playlist = selected_playlist or self._last_playlist
@@ -207,7 +251,7 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
             return
 
         if selected_step:
-            await self._client.command("Play playlist step", parameters=f"{playlist},{selected_step}")
+            await self._client.play_step(playlist, selected_step)
             if isinstance(store, dict):
                 store.pop("selected_step", None)
         else:
@@ -246,9 +290,17 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
         return ts or dt_util.utcnow()
 
     async def async_browse_media(
-        self, media_content_type: Optional[str] = None, media_content_id: Optional[str] = None
+        self,
+        media_content_type: Optional[str] = None,
+        media_content_id: Optional[str] = None,
     ) -> BrowseMedia:
-        playlists = self.coordinator.data.get("_playlists") if self.coordinator.data else []
+        if not self._entry.options.get(CONF_ENABLE_BROWSE, DEFAULT_ENABLE_BROWSE):
+            raise HomeAssistantError(
+                "Media browsing is disabled in integration options."
+            )
+        playlists = (
+            self.coordinator.data.get("_playlists") if self.coordinator.data else []
+        )
 
         if not media_content_id:
             root = BrowseMedia(
@@ -287,7 +339,7 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
                         title=pl.get("name", ""),
                         media_class=MediaClass.DIRECTORY,
                         media_content_type="xlights_playlist",
-                        media_content_id=pl.get("name", ""),
+                        media_content_id=f"id:{pl['id']}",
                         can_play=True,
                         can_expand=True,
                     )
@@ -297,13 +349,21 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
             return node
 
         if media_content_type == "xlights_playlist":
-            pl_name = media_content_id
-            steps = await self._client.get_steps(pl_name)
+            pl_ref = await self._client.playlist_reference(media_content_id)
+            pl_name = next(
+                (
+                    p.get("name")
+                    for p in playlists or []
+                    if str(p.get("id")) == pl_ref[3:]
+                ),
+                media_content_id,
+            )
+            steps = await self._client.get_steps(pl_ref)
             node = BrowseMedia(
                 title=pl_name,
                 media_class=MediaClass.DIRECTORY,
                 media_content_type="xlights_playlist",
-                media_content_id=pl_name,
+                media_content_id=pl_ref,
                 can_play=True,
                 can_expand=True,
                 children=[
@@ -311,7 +371,7 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
                         title=st.get("name", ""),
                         media_class=MediaClass.MUSIC,
                         media_content_type="xlights_step",
-                        media_content_id=f"{pl_name}|{st.get('name','')}",
+                        media_content_id=f"{pl_ref}|id:{st['id']}",
                         can_play=True,
                         can_expand=False,
                     )
@@ -321,8 +381,20 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
             return node
 
         if media_content_type == "xlights_step":
+            title = "Step"
+            if media_content_id and "|" in media_content_id:
+                pl_ref, step_ref = media_content_id.split("|", 1)
+                steps = await self._client.get_steps(pl_ref)
+                title = next(
+                    (
+                        s.get("name")
+                        for s in steps
+                        if step_ref == f"id:{s.get('id')}" or step_ref == s.get("name")
+                    ),
+                    step_ref,
+                )
             return BrowseMedia(
-                title=media_content_id.split("|")[-1] if media_content_id else "Step",
+                title=title,
                 media_class=MediaClass.MUSIC,
                 media_content_type="xlights_step",
                 media_content_id=media_content_id,
@@ -332,7 +404,9 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
 
         return await self.async_browse_media()
 
-    async def async_play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
+    async def async_play_media(
+        self, media_type: str, media_id: str, **kwargs: Any
+    ) -> None:
         if media_type == "xlights_playlist":
             await self._client.play_playlist(media_id)
         elif media_type == "xlights_step":
@@ -341,7 +415,7 @@ class XScheduleMediaPlayer(CoordinatorEntity[XScheduleCoordinator], MediaPlayerE
             except ValueError:
                 _LOGGER.warning("Invalid media_id for xlights_step: %s", media_id)
                 return
-            await self._client.command("Play playlist step", parameters=f"{pl},{step}")
+            await self._client.play_step(pl, step)
         await self.coordinator.async_request_refresh()
 
     def _handle_coordinator_update(self) -> None:

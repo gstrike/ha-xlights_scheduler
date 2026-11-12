@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientError
+from homeassistant.exceptions import HomeAssistantError
 from urllib.parse import quote
 
 from .const import REFERENCE_PREFIX
@@ -13,8 +15,18 @@ from .const import REFERENCE_PREFIX
 _LOGGER = logging.getLogger(__name__)
 
 
+class XScheduleError(HomeAssistantError):
+    """An xSchedule request was rejected or returned invalid data."""
+
+
+class XScheduleAuthError(XScheduleError):
+    """xSchedule authentication failed."""
+
+
 class XScheduleClient:
-    def __init__(self, session: ClientSession, host: str, port: int, password: str | None) -> None:
+    def __init__(
+        self, session: ClientSession, host: str, port: int, password: str | None
+    ) -> None:
         self._session = session
         self._host = host
         self._port = port
@@ -23,6 +35,7 @@ class XScheduleClient:
         self._server_seen_ip: Optional[str] = None
         self._logged_in: bool = False
         self._lock = asyncio.Lock()
+        self.control_lock = asyncio.Lock()
 
         # caches
         self._playlists: List[Dict[str, Any]] | None = None
@@ -105,72 +118,167 @@ class XScheduleClient:
         return hashlib.md5(text.encode("utf-8")).hexdigest()
 
     async def _ensure_login(self) -> None:
-        if not self._password:
-            return
-        if not self._logged_in:
-            await self.async_login()
+        if self._password and not self._logged_in:
+            if not await self.async_login():
+                raise XScheduleAuthError(
+                    "xSchedule authentication failed. Check the configured password."
+                )
 
-    async def query(self, query: str, parameters: str = "", reference: str | None = None) -> Dict[str, Any]:
-        await self._ensure_login()
-        base = f"{self._base}/xScheduleQuery"
-        # Manually build query string to ensure spaces become %20 (not '+')
-        qp = {
-            "Query": query,
-            "Parameters": parameters,
-            "Reference": reference or REFERENCE_PREFIX,
-        }
-        safe_chars = ",:+|-_:."
-        qs = "&".join(f"{k}={quote(str(v), safe=safe_chars)}" for k, v in qp.items())
-        url = f"{base}?{qs}"
-        async with self._session.get(url, timeout=15) as resp:
-            js = await resp.json(content_type=None)
-        # Handle not logged in (password enabled)
-        if js.get("result") == "not logged in":
-            self._logged_in = False
-            await self._ensure_login()
-            async with self._session.get(url, timeout=15) as resp:
-                js = await resp.json(content_type=None)
+    async def _request(
+        self, endpoint: str, arguments: dict[str, str], data: str = ""
+    ) -> Dict[str, Any]:
+        # xSchedule expects %20, not form-style '+' for spaces. Encode values
+        # once; IDs below solve the API's separate comma-delimiter problem.
+        qs = "&".join(f"{k}={quote(str(v), safe='')}" for k, v in arguments.items())
+        url = f"{self._base}/{endpoint}?{qs}"
+        try:
+            async with self._session.get(url, data=data, timeout=15) as response:
+                response.raise_for_status()
+                js = await response.json(content_type=None)
+        except (ClientError, asyncio.TimeoutError, ValueError) as error:
+            raise XScheduleError(f"xSchedule request failed: {error}") from error
+        if not isinstance(js, dict):
+            raise XScheduleError("xSchedule returned an invalid response.")
         return js
 
-    async def command(self, command: str, parameters: str = "", data: str = "", reference: str | None = None) -> Dict[str, Any]:
+    async def _authenticated_request(
+        self, endpoint: str, arguments: dict[str, str], data: str = ""
+    ) -> Dict[str, Any]:
         await self._ensure_login()
-        base = f"{self._base}/xScheduleCommand"
-        qp = {
-            "Command": command,
-            "Parameters": parameters,
-            "Reference": reference or REFERENCE_PREFIX,
-        }
-        safe_chars = ",:+|-_:."
-        qs = "&".join(f"{k}={quote(str(v), safe=safe_chars)}" for k, v in qp.items())
-        url = f"{base}?{qs}"
-        async with self._session.get(url, data=data, timeout=15) as resp:
-            js = await resp.json(content_type=None)
+        js = await self._request(endpoint, arguments, data)
         if js.get("result") == "not logged in":
             self._logged_in = False
+            if not self._password:
+                raise XScheduleAuthError(
+                    "xSchedule requires a password. Configure it in the integration."
+                )
             await self._ensure_login()
-            async with self._session.get(url, data=data, timeout=15) as resp:
-                js = await resp.json(content_type=None)
+            js = await self._request(endpoint, arguments, data)
+        result = js.get("result")
+        if result == "not logged in":
+            self._logged_in = False
+            raise XScheduleAuthError(
+                "xSchedule rejected authentication after logging in again."
+            )
+        if result is not None and result != "ok":
+            raise XScheduleError(str(js.get("message") or result))
         return js
 
-    # Convenience wrappers
+    async def query(
+        self, query: str, parameters: str = "", reference: str | None = None
+    ) -> Dict[str, Any]:
+        return await self._authenticated_request(
+            "xScheduleQuery",
+            {
+                "Query": query,
+                "Parameters": parameters,
+                "Reference": reference or REFERENCE_PREFIX,
+            },
+        )
+
+    async def command(
+        self,
+        command: str,
+        parameters: str = "",
+        data: str = "",
+        reference: str | None = None,
+    ) -> Dict[str, Any]:
+        js = await self._authenticated_request(
+            "xScheduleCommand",
+            {
+                "Command": command,
+                "Parameters": parameters,
+                "Reference": reference or REFERENCE_PREFIX,
+            },
+            data,
+        )
+        if js.get("result") != "ok":
+            raise XScheduleError("xSchedule did not confirm the command succeeded.")
+        return js
+
+    @staticmethod
+    def _id_reference(value: str) -> str | None:
+        if re.fullmatch(r"id:[0-9]+", value, flags=re.IGNORECASE):
+            return f"id:{int(value[3:])}"
+        return None
+
+    @staticmethod
+    def _reference_for(items: list[dict[str, Any]], value: str, kind: str) -> str:
+        reference = XScheduleClient._id_reference(value)
+        matches = [
+            item
+            for item in items
+            if (
+                str(item.get("id")) == reference[3:]
+                if reference
+                else item.get("name") == value
+            )
+        ]
+        if len(matches) != 1 or not str(matches[0].get("id", "")).isdigit():
+            raise XScheduleError(
+                f"{kind} {value!r} was not found uniquely. Refresh the list or use an id: reference."
+            )
+        return f"id:{matches[0]['id']}"
+
+    async def playlist_reference(self, playlist: str) -> str:
+        reference = self._id_reference(playlist)
+        if reference:
+            return reference
+        # Refresh at selection time: IDs may change after a scheduler restart.
+        return self._reference_for(await self.get_playlists(), playlist, "Playlist")
+
     async def get_playlists(self) -> List[Dict[str, Any]]:
         js = await self.query("GetPlayLists")
-        pls = js.get("playlists", [])
+        pls = js.get("playlists")
+        if not isinstance(pls, list) or not all(isinstance(p, dict) for p in pls):
+            raise XScheduleError("xSchedule returned an invalid playlist list.")
         self._playlists = pls
         return pls
 
     async def get_steps(self, playlist_name_or_id: str) -> List[Dict[str, Any]]:
-        js = await self.query("GetPlayListSteps", parameters=playlist_name_or_id)
-        steps = js.get("steps", [])
-        self._steps_cache[playlist_name_or_id] = steps
+        reference = await self.playlist_reference(playlist_name_or_id)
+        js = await self.query("GetPlayListSteps", parameters=reference)
+        steps = js.get("steps")
+        if not isinstance(steps, list) or not all(isinstance(s, dict) for s in steps):
+            raise XScheduleError("xSchedule returned an invalid step list.")
+        self._steps_cache[reference] = steps
         return steps
 
     async def get_playing_status(self) -> Dict[str, Any]:
-        return await self.query("GetPlayingStatus")
+        js = await self.query("GetPlayingStatus")
+        if not isinstance(js.get("status"), str) or not js["status"]:
+            raise XScheduleError(
+                "xSchedule returned a response without playback status."
+            )
+        return js
 
-    async def play_playlist(self, playlist: str, looped: bool = False) -> Dict[str, Any]:
-        cmd = "Play specified playlist looped" if looped else "Play specified playlist"
-        return await self.command(cmd, parameters=playlist)
+    async def play_playlist(
+        self, playlist: str, looped: bool = False
+    ) -> Dict[str, Any]:
+        command = (
+            "Play specified playlist looped" if looped else "Play specified playlist"
+        )
+        return await self.command(
+            command, parameters=await self.playlist_reference(playlist)
+        )
+
+    async def play_step(
+        self, playlist: str, step: str, looped: bool = False
+    ) -> Dict[str, Any]:
+        playlist_id = await self.playlist_reference(playlist)
+        step_id = self._reference_for(await self.get_steps(playlist_id), step, "Step")
+        command = (
+            "Play specified step in specified playlist looped"
+            if looped
+            else "Play playlist step"
+        )
+        return await self.command(command, parameters=f"{playlist_id},{step_id}")
+
+    async def set_background(self, playlist: str) -> Dict[str, Any]:
+        return await self.command(
+            "Set playlist as background",
+            parameters=await self.playlist_reference(playlist),
+        )
 
     async def stop(self) -> Dict[str, Any]:
         return await self.command("Stop")

@@ -3,7 +3,7 @@ import re
 from homeassistant.config_entries import ConfigEntry
 
 DOMAIN = "xlights_scheduler"
-INTEGRATION_VERSION = "0.1.0"
+INTEGRATION_VERSION = "1.1.0"
 
 CONF_HOST = "host"
 CONF_PORT = "port"
@@ -63,3 +63,12 @@ def slugify_entry_title(entry: ConfigEntry) -> str:
     slug = re.sub(r"[^a-z0-9]+", "_", name.lower())
     slug = re.sub(r"_+", "_", slug).strip("_")
     return slug or DOMAIN
+
+
+def player_key(entry: ConfigEntry) -> str:
+    """Keep registry identity when connection details are reconfigured."""
+    return (
+        entry.data.get("_player_key")
+        or entry.unique_id
+        or f"{entry.data['host']}:{entry.data['port']}"
+    )

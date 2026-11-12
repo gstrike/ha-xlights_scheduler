@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 import logging
+from functools import partial
+import voluptuous as vol
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from homeassistant.exceptions import HomeAssistantError
 from .client import XScheduleClient
 from .coordinator import XScheduleCoordinator
 from .const import (
     CONF_HOST,
     CONF_PASSWORD,
-    CONF_POLL_IDLE,
-    CONF_POLL_PLAYING,
     CONF_PORT,
-    DEFAULT_POLL_IDLE,
-    DEFAULT_POLL_PLAYING,
     DOMAIN,
     PLATFORMS,
     EVENT_TEST_MODE_STARTED,
@@ -35,7 +34,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     password = entry.data.get(CONF_PASSWORD, "")
 
     client = XScheduleClient(session, host, port, password)
-    coordinator = XScheduleCoordinator(hass, client, entry.options)
+    coordinator = XScheduleCoordinator(
+        hass, client, entry.options, entry_id=entry.entry_id
+    )
 
     await coordinator.async_config_entry_first_refresh()
 
@@ -44,10 +45,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "coordinator": coordinator,
     }
 
-    # Schedule platform setups to avoid blocking import warnings inside the event loop
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    )
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     _register_services(hass)
     return True
@@ -60,23 +58,29 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
-def _get_integration_objects(hass: HomeAssistant) -> tuple[XScheduleClient | None, XScheduleCoordinator | None]:
+def _get_integration_objects(hass: HomeAssistant, entry_id: str | None = None):
     data = hass.data.get(DOMAIN) or {}
-    if not data:
-        return None, None
-    # single instance for now – just take the first
-    entry_id = next(iter(data))
+    if entry_id is None:
+        if len(data) != 1:
+            raise HomeAssistantError(
+                "Specify config_entry_id when there is not exactly one loaded xSchedule player."
+            )
+        entry_id = next(iter(data))
+    if entry_id not in data:
+        raise HomeAssistantError("The selected xSchedule player is not loaded.")
     entry_data = data[entry_id]
-    return entry_data.get("client"), entry_data.get("coordinator")
+    return entry_data["client"], entry_data["coordinator"]
 
 
 def _register_services(hass: HomeAssistant) -> None:
     async def _service_wrapper(call, handler):
-        client, coordinator = _get_integration_objects(hass)
+        client, coordinator = _get_integration_objects(
+            hass, call.data.get("config_entry_id")
+        )
         if not client:
             return
-        await handler(client, coordinator, call.data)
-        if coordinator:
+        async with client.control_lock:
+            await handler(client, coordinator, call.data)
             await coordinator.async_request_refresh()
 
     async def svc_play_playlist(client: XScheduleClient, _, data: dict):
@@ -93,13 +97,7 @@ def _register_services(hass: HomeAssistant) -> None:
         step = data.get("step")
         looped = data.get("looped", False)
         if playlist and step:
-            if looped:
-                await client.command(
-                    "Play specified step in specified playlist looped",
-                    parameters=f"{playlist},{step}",
-                )
-            else:
-                await client.command("Play playlist step", parameters=f"{playlist},{step}")
+            await client.play_step(playlist, step, looped=bool(looped))
 
     async def svc_seek_ms(client: XScheduleClient, _, data: dict):
         pos = int(data.get("position_ms", 0))
@@ -108,22 +106,26 @@ def _register_services(hass: HomeAssistant) -> None:
     async def svc_toggle_playlist_loop(client: XScheduleClient, __, ___):
         await client.toggle_playlist_loop()
 
-    async def svc_set_playlist_loop(client: XScheduleClient, coordinator: XScheduleCoordinator | None, data: dict):
+    async def svc_set_playlist_loop(
+        client: XScheduleClient, coordinator: XScheduleCoordinator | None, data: dict
+    ):
         desired = bool(data.get("state", False))
-        current = False
-        if coordinator and coordinator.data:
-            current = coordinator.data.get("playlistlooping", "false") == "true"
+        status = await client.get_playing_status()
+        if status.get("status") not in ("playing", "paused"):
+            raise HomeAssistantError("Playlist loop requires an active playlist.")
+        current = str(status.get("playlistlooping", "false")).lower() == "true"
         if desired != current:
             await client.toggle_playlist_loop()
 
     async def svc_toggle_output(client: XScheduleClient, __, ___):
         await client.toggle_output_to_lights()
 
-    async def svc_set_output(client: XScheduleClient, coordinator: XScheduleCoordinator | None, data: dict):
+    async def svc_set_output(
+        client: XScheduleClient, coordinator: XScheduleCoordinator | None, data: dict
+    ):
         desired = bool(data.get("state", False))
-        current = False
-        if coordinator and coordinator.data:
-            current = coordinator.data.get("outputtolights", "false") == "true"
+        status = await client.get_playing_status()
+        current = str(status.get("outputtolights", "false")).lower() == "true"
         if desired != current:
             await client.toggle_output_to_lights()
 
@@ -135,7 +137,7 @@ def _register_services(hass: HomeAssistant) -> None:
         delta = int(data.get("delta", 0))
         await client.adjust_volume(delta)
 
-    async def svc_start_test_mode(client: XScheduleClient, __, data: dict):
+    async def svc_start_test_mode(client: XScheduleClient, coordinator, data: dict):
         mode = data.get("mode") or "Alternate"
         model = data.get("model")
         interval = data.get("interval")
@@ -153,34 +155,76 @@ def _register_services(hass: HomeAssistant) -> None:
         params = "|".join(parts)
         res = await client.command("Start test mode", parameters=params)
         if res.get("result") == "ok":
+            coordinator.test_mode = True
             hass.bus.async_fire(
                 EVENT_TEST_MODE_STARTED,
                 {
                     "mode": mode,
-                    "device": f"{DOMAIN}:{client.base_url}",
+                    **coordinator.event_context,
                 },
             )
 
-    async def svc_stop_test_mode(client: XScheduleClient, __, data: dict):
+    async def svc_stop_test_mode(client: XScheduleClient, coordinator, data: dict):
         res = await client.command("Stop test mode")
         if res.get("result") == "ok":
+            coordinator.test_mode = False
             hass.bus.async_fire(
                 EVENT_TEST_MODE_STOPPED,
                 {
-                    "device": f"{DOMAIN}:{client.base_url}",
+                    **coordinator.event_context,
                 },
             )
 
-
-    hass.services.async_register(DOMAIN, "play_playlist", lambda call: _service_wrapper(call, svc_play_playlist))
-    hass.services.async_register(DOMAIN, "stop_playlist", lambda call: _service_wrapper(call, svc_stop_playlist))
-    hass.services.async_register(DOMAIN, "play_step", lambda call: _service_wrapper(call, svc_play_step))
-    hass.services.async_register(DOMAIN, "seek_ms", lambda call: _service_wrapper(call, svc_seek_ms))
-    hass.services.async_register(DOMAIN, "toggle_playlist_loop", lambda call: _service_wrapper(call, svc_toggle_playlist_loop))
-    hass.services.async_register(DOMAIN, "set_playlist_loop", lambda call: _service_wrapper(call, svc_set_playlist_loop))
-    hass.services.async_register(DOMAIN, "toggle_output_to_lights", lambda call: _service_wrapper(call, svc_toggle_output))
-    hass.services.async_register(DOMAIN, "set_output_to_lights", lambda call: _service_wrapper(call, svc_set_output))
-    hass.services.async_register(DOMAIN, "set_volume", lambda call: _service_wrapper(call, svc_set_volume))
-    hass.services.async_register(DOMAIN, "adjust_volume", lambda call: _service_wrapper(call, svc_adjust_volume))
-    hass.services.async_register(DOMAIN, "start_test_mode", lambda call: _service_wrapper(call, svc_start_test_mode))
-    hass.services.async_register(DOMAIN, "stop_test_mode", lambda call: _service_wrapper(call, svc_stop_test_mode))
+    target = {vol.Optional("config_entry_id"): str}
+    fields = {
+        "play_playlist": {
+            vol.Required("playlist"): str,
+            vol.Optional("looped", default=False): bool,
+        },
+        "play_step": {
+            vol.Required("playlist"): str,
+            vol.Required("step"): str,
+            vol.Optional("looped", default=False): bool,
+        },
+        "seek_ms": {
+            vol.Required("position_ms"): vol.All(vol.Coerce(int), vol.Range(min=0))
+        },
+        "set_playlist_loop": {vol.Required("state"): bool},
+        "set_output_to_lights": {vol.Required("state"): bool},
+        "set_volume": {
+            vol.Required("volume"): vol.All(vol.Coerce(int), vol.Range(min=0, max=100))
+        },
+        "adjust_volume": {
+            vol.Required("delta"): vol.All(
+                vol.Coerce(int), vol.Range(min=-100, max=100)
+            )
+        },
+        "start_test_mode": {
+            vol.Optional("mode"): str,
+            vol.Optional("model"): str,
+            vol.Optional("interval"): vol.All(vol.Coerce(int), vol.Range(min=1)),
+            vol.Optional("foreground"): vol.Coerce(int),
+            vol.Optional("background"): vol.Coerce(int),
+        },
+    }
+    handlers = {
+        "play_playlist": svc_play_playlist,
+        "stop_playlist": svc_stop_playlist,
+        "play_step": svc_play_step,
+        "seek_ms": svc_seek_ms,
+        "toggle_playlist_loop": svc_toggle_playlist_loop,
+        "set_playlist_loop": svc_set_playlist_loop,
+        "toggle_output_to_lights": svc_toggle_output,
+        "set_output_to_lights": svc_set_output,
+        "set_volume": svc_set_volume,
+        "adjust_volume": svc_adjust_volume,
+        "start_test_mode": svc_start_test_mode,
+        "stop_test_mode": svc_stop_test_mode,
+    }
+    for name, handler in handlers.items():
+        hass.services.async_register(
+            DOMAIN,
+            name,
+            partial(_service_wrapper, handler=handler),
+            schema=vol.Schema({**target, **fields.get(name, {})}),
+        )

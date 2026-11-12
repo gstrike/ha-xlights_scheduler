@@ -10,6 +10,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from homeassistant.exceptions import HomeAssistantError
+from .const import player_key
 from .client import XScheduleClient
 from .coordinator import XScheduleCoordinator
 from .const import (
@@ -23,7 +25,9 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
     data = hass.data[DOMAIN][entry.entry_id]
     client: XScheduleClient = data["client"]
     coordinator: XScheduleCoordinator = data["coordinator"]
@@ -42,19 +46,26 @@ class OutputToLightsSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity
     _attr_translation_key = "output_to_lights"
     _attr_icon = "mdi:lightbulb-on"
 
-    def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        client: XScheduleClient,
+        coordinator: XScheduleCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
         super().__init__(coordinator)
         self._client = client
         self._entry = entry
-        self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:switch_output_to_lights"
+        self._attr_unique_id = f"{player_key(entry)}:switch_output_to_lights"
         device_slug = slugify_entry_title(entry)
         self.entity_id = f"switch.{DOMAIN}_{device_slug}_output_to_lights"
-    
+
     @property
     def device_info(self):
-        xs_ver = (self.coordinator.data or {}).get("version") if self.coordinator else None
+        xs_ver = (
+            (self.coordinator.data or {}).get("version") if self.coordinator else None
+        )
         return {
-            "identifiers": {(DOMAIN, f"{self._entry.data['host']}:{self._entry.data['port']}")},
+            "identifiers": {(DOMAIN, f"{player_key(self._entry)}")},
             "name": "xLights Scheduler",
             "manufacturer": "xLights",
             "model": "xSchedule",
@@ -67,13 +78,19 @@ class OutputToLightsSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity
         return (data.get("outputtolights") or "false") == "true"
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        if not self.is_on:
-            await self._client.toggle_output_to_lights()
+        async with self._client.control_lock:
+            status = await self._client.get_playing_status()
+            current = str(status.get("outputtolights", "false")).lower() == "true"
+            if current != True:
+                await self._client.toggle_output_to_lights()
             await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        if self.is_on:
-            await self._client.toggle_output_to_lights()
+        async with self._client.control_lock:
+            status = await self._client.get_playing_status()
+            current = str(status.get("outputtolights", "false")).lower() == "true"
+            if current != False:
+                await self._client.toggle_output_to_lights()
             await self.coordinator.async_request_refresh()
 
 
@@ -82,19 +99,26 @@ class PlaylistLoopSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity):
     _attr_translation_key = "playlist_loop"
     _attr_icon = "mdi:repeat"
 
-    def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        client: XScheduleClient,
+        coordinator: XScheduleCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
         super().__init__(coordinator)
         self._client = client
         self._entry = entry
-        self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:switch_playlist_loop"
+        self._attr_unique_id = f"{player_key(entry)}:switch_playlist_loop"
         device_slug = slugify_entry_title(entry)
         self.entity_id = f"switch.{DOMAIN}_{device_slug}_playlist_loop"
-    
+
     @property
     def device_info(self):
-        xs_ver = (self.coordinator.data or {}).get("version") if self.coordinator else None
+        xs_ver = (
+            (self.coordinator.data or {}).get("version") if self.coordinator else None
+        )
         return {
-            "identifiers": {(DOMAIN, f"{self._entry.data['host']}:{self._entry.data['port']}")},
+            "identifiers": {(DOMAIN, f"{player_key(self._entry)}")},
             "name": "xLights Scheduler",
             "manufacturer": "xLights",
             "model": "xSchedule",
@@ -103,9 +127,11 @@ class PlaylistLoopSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity):
 
     @property
     def available(self) -> bool:
-        # Expose the playlist loop control even when idle so users
-        # can preconfigure loop state for the next playback.
-        return True
+        # xSchedule can only toggle loop state on a running playlist.
+        return super().available and (self.coordinator.data or {}).get("status") in (
+            "playing",
+            "paused",
+        )
 
     @property
     def is_on(self) -> bool:
@@ -113,13 +139,23 @@ class PlaylistLoopSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity):
         return (data.get("playlistlooping") or "false") == "true"
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        if not self.is_on:
-            await self._client.toggle_playlist_loop()
+        async with self._client.control_lock:
+            status = await self._client.get_playing_status()
+            if status.get("status") not in ("playing", "paused"):
+                raise HomeAssistantError("Playlist loop requires an active playlist.")
+            current = str(status.get("playlistlooping", "false")).lower() == "true"
+            if current != True:
+                await self._client.toggle_playlist_loop()
             await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        if self.is_on:
-            await self._client.toggle_playlist_loop()
+        async with self._client.control_lock:
+            status = await self._client.get_playing_status()
+            if status.get("status") not in ("playing", "paused"):
+                raise HomeAssistantError("Playlist loop requires an active playlist.")
+            current = str(status.get("playlistlooping", "false")).lower() == "true"
+            if current != False:
+                await self._client.toggle_playlist_loop()
             await self.coordinator.async_request_refresh()
 
 
@@ -129,19 +165,26 @@ class TestModeSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:test-tube"
 
-    def __init__(self, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        client: XScheduleClient,
+        coordinator: XScheduleCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
         super().__init__(coordinator)
         self._client = client
         self._entry = entry
-        self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:switch_test_mode"
+        self._attr_unique_id = f"{player_key(entry)}:switch_test_mode"
         device_slug = slugify_entry_title(entry)
         self.entity_id = f"switch.{DOMAIN}_{device_slug}_test_mode"
 
     @property
     def device_info(self):
-        xs_ver = (self.coordinator.data or {}).get("version") if self.coordinator else None
+        xs_ver = (
+            (self.coordinator.data or {}).get("version") if self.coordinator else None
+        )
         return {
-            "identifiers": {(DOMAIN, f"{self._entry.data['host']}:{self._entry.data['port']}")},
+            "identifiers": {(DOMAIN, f"{player_key(self._entry)}")},
             "name": "xLights Scheduler",
             "manufacturer": "xLights",
             "model": "xSchedule",
@@ -150,8 +193,11 @@ class TestModeSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity):
 
     @property
     def is_on(self) -> bool:
-        # Optimistic: remember last requested state
-        return bool(self.hass.data[DOMAIN][self._entry.entry_id].get("test_mode", False))
+        return self.coordinator.test_mode
+
+    @property
+    def assumed_state(self) -> bool:
+        return True
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         # xSchedule requires at least one parameter: test mode name
@@ -159,12 +205,12 @@ class TestModeSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity):
         mode = "Alternate"
         res = await self._client.command("Start test mode", parameters=mode)
         if res.get("result") == "ok":
-            self.hass.data[DOMAIN][self._entry.entry_id]["test_mode"] = True
+            self.coordinator.test_mode = True
             self.hass.bus.async_fire(
                 EVENT_TEST_MODE_STARTED,
                 {
                     "mode": mode,
-                    "device": f"{DOMAIN}:{self._entry.data['host']}:{self._entry.data['port']}",
+                    **self.coordinator.event_context,
                 },
             )
             await self.coordinator.async_request_refresh()
@@ -172,11 +218,11 @@ class TestModeSwitch(CoordinatorEntity[XScheduleCoordinator], SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         res = await self._client.command("Stop test mode")
         if res.get("result") == "ok":
-            self.hass.data[DOMAIN][self._entry.entry_id]["test_mode"] = False
+            self.coordinator.test_mode = False
             self.hass.bus.async_fire(
                 EVENT_TEST_MODE_STOPPED,
                 {
-                    "device": f"{DOMAIN}:{self._entry.data['host']}:{self._entry.data['port']}",
+                    **self.coordinator.event_context,
                 },
             )
             await self.coordinator.async_request_refresh()

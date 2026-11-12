@@ -2,36 +2,85 @@
   "title": "xLights Scheduler",
   "entity": {
     "media_player": {
-      "xlights": { "name": "xLights Scheduler" }
+      "xlights": {
+        "name": "xLights Scheduler"
+      }
     },
     "switch": {
-      "output_to_lights": { "name": "Output to lights" },
-      "playlist_loop": { "name": "Playlist loop" },
-      "test_mode": { "name": "Test mode" }
+      "output_to_lights": {
+        "name": "Output to lights"
+      },
+      "playlist_loop": {
+        "name": "Playlist loop"
+      },
+      "test_mode": {
+        "name": "Test mode"
+      }
     },
     "number": {
-      "brightness": { "name": "Brightness" }
+      "brightness": {
+        "name": "Brightness"
+      }
     },
     "select": {
-      "playlist": { "name": "Playlist" },
-      "step": { "name": "Step" },
-      "background_playlist": { "name": "Background playlist" }
+      "playlist": {
+        "name": "Playlist"
+      },
+      "step": {
+        "name": "Step"
+      },
+      "background_playlist": {
+        "name": "Background playlist"
+      }
     },
     "button": {
-      "next_step": { "name": "Next step" },
-      "prior_step": { "name": "Prior step" },
-      "restart_step": { "name": "Restart step" },
-      "stop_all_now": { "name": "Stop all now" },
-      "close_xschedule": { "name": "Close xSchedule" }
+      "next_step": {
+        "name": "Next step"
+      },
+      "prior_step": {
+        "name": "Prior step"
+      },
+      "restart_step": {
+        "name": "Restart step"
+      },
+      "stop_all_now": {
+        "name": "Stop all now"
+      },
+      "close_xschedule": {
+        "name": "Close xSchedule"
+      }
     },
     "sensor": {
-      "playlist_step_count": { "name": "Playlist step count" },
-      "current_playlist": { "name": "Current playlist" },
-      "current_playlist_step": { "name": "Current playlist step" },
-      "next_scheduled_start": { "name": "Next scheduled start" },
-      "next_scheduled_start_minutes": { "name": "Next scheduled start (minutes)" },
-      "next_scheduled_playlist": { "name": "Next scheduled playlist" },
-      "xschedule_version": { "name": "xSchedule version" }
+      "playlist_step_count": {
+        "name": "Playlist step count"
+      },
+      "current_playlist": {
+        "name": "Current playlist"
+      },
+      "current_playlist_step": {
+        "name": "Current playlist step"
+      },
+      "next_scheduled_start": {
+        "name": "Next scheduled start"
+      },
+      "next_scheduled_start_minutes": {
+        "name": "Next scheduled start (minutes)"
+      },
+      "next_scheduled_playlist": {
+        "name": "Next scheduled playlist"
+      },
+      "xschedule_version": {
+        "name": "xSchedule version"
+      },
+      "song_remaining": {
+        "name": "Song time remaining"
+      },
+      "show_remaining": {
+        "name": "Show time remaining"
+      },
+      "playback_source": {
+        "name": "Playback source"
+      }
     }
   },
   "config": {
@@ -43,10 +92,28 @@
           "port": "Port",
           "password": "Password (optional)"
         }
+      },
+      "reconfigure": {
+        "title": "Update xSchedule connection",
+        "data": {
+          "host": "Host/IP",
+          "port": "Port",
+          "password": "Password (optional)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Update xSchedule authentication",
+        "data": {
+          "host": "Host/IP",
+          "port": "Port",
+          "password": "Password (optional)"
+        }
       }
     },
     "error": {
-      "cannot_connect": "Cannot connect or authenticate"
+      "cannot_connect": "Cannot connect or authenticate",
+      "invalid_auth": "Authentication failed. Check the password.",
+      "invalid_connection": "Enter a host and a port from 1 to 65535."
     }
   },
   "options": {
@@ -59,6 +126,9 @@
           "lists_refresh_secs": "Refresh playlists/steps every (s)"
         }
       }
+    },
+    "error": {
+      "invalid_interval": "Intervals must be positive whole seconds."
     }
   }
 }

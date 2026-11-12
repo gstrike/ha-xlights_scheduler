@@ -1,11 +1,13 @@
 {
   "domain": "xlights_scheduler",
   "name": "xLights Scheduler",
-  "codeowners": ["@gstrike"],
+  "codeowners": [
+    "@gstrike"
+  ],
   "config_flow": true,
-  "documentation": "https://github.com/gstrike/ha-xlights-scheduler#readme",
+  "documentation": "https://github.com/gstrike/ha-xlights_scheduler#readme",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/gstrike/ha-xlights-scheduler/issues",
+  "issue_tracker": "https://github.com/gstrike/ha-xlights_scheduler/issues",
   "requirements": [],
-  "version": "1.0.0"
+  "version": "1.1.0"
 }
