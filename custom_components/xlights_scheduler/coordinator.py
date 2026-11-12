@@ -8,7 +8,8 @@ from homeassistant.util import dt as dt_util
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .client import XScheduleClient
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from .client import XScheduleClient, XScheduleAuthError
 from .const import (
     CONF_POLL_IDLE,
     CONF_POLL_PLAYING,
@@ -31,11 +32,31 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
-    def __init__(self, hass: HomeAssistant, client: XScheduleClient, options: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        client: XScheduleClient,
+        options: dict[str, Any],
+        entry_id: str | None = None,
+    ) -> None:
         self.client = client
-        self._options = options or {}
+        self.entry_id = entry_id or f"{client.host}:{client.port}"
+        self.event_context = {
+            "device": f"{DOMAIN}:{self.entry_id}",
+            "config_entry_id": self.entry_id,
+            "host": client.host,
+            "port": client.port,
+            "base_url": client.base_url,
+        }
+        # Upstream's status API does not expose these states.
+        self.test_mode: bool | None = None
+        self.background_playlist: str | None = None
+        self.list_error: str | None = None
+        self._options = dict(options or {})
 
-        interval = dt.timedelta(seconds=self._options.get(CONF_POLL_IDLE, DEFAULT_POLL_IDLE))
+        interval = dt.timedelta(
+            seconds=self._options.get(CONF_POLL_IDLE, DEFAULT_POLL_IDLE)
+        )
         super().__init__(
             hass,
             _LOGGER,
@@ -56,6 +77,7 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         self._last_playlist: str | None = None
         self._last_playlist_id: str | None = None
         self._last_step: str | None = None
+        self._last_step_key = None
         self._last_output: bool | None = None
         self._last_playlist_loop: bool | None = None
 
@@ -82,7 +104,8 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         if (
             self._last_next_scheduled is not None
             and self._last_next_scheduled_ts is not None
-            and (now - self._last_next_scheduled_ts).total_seconds() <= self._lists_refresh_secs
+            and (now - self._last_next_scheduled_ts).total_seconds()
+            <= self._lists_refresh_secs
         ):
             return self._last_next_scheduled
 
@@ -95,8 +118,13 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
             if not name:
                 continue
             try:
-                js = await self.client.query("GetPlayListSchedules", parameters=name)
-            except Exception:
+                js = await self.client.query(
+                    "GetPlayListSchedules",
+                    parameters=f"id:{pl['id']}" if pl.get("id") is not None else name,
+                )
+            except Exception as error:
+                self.list_error = str(error)
+                _LOGGER.warning("Cannot refresh schedules for %s: %s", name, error)
                 continue
             schedules = js.get("schedules") or []
             for sch in schedules:
@@ -149,9 +177,12 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
     async def _async_update_data(self) -> Dict[str, Any]:
         try:
             status = await self.client.get_playing_status()
+        except XScheduleAuthError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
         except Exception as err:
-            raise UpdateFailed(err) from err
+            raise UpdateFailed(str(err)) from err
 
+        fetched_at = dt_util.utcnow()
         if isinstance(status, dict) and status.get("status"):
             self._apply_interval_for_status(status.get("status", "idle"))
         else:
@@ -171,7 +202,7 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                 EVENT_VERSION_CHANGED,
                 {
                     "version": ver,
-                    "device": f"{DOMAIN}:{id(self)}",
+                    **self.event_context,
                 },
             )
 
@@ -180,31 +211,62 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         if (
             self._last_playlists is None
             or self._last_playlists_ts is None
-            or (now - self._last_playlists_ts).total_seconds() > self._lists_refresh_secs
+            or (now - self._last_playlists_ts).total_seconds()
+            > self._lists_refresh_secs
         ):
             try:
                 self._last_playlists = await self.client.get_playlists()
+                self.list_error = None
                 self._last_playlists_ts = now
                 self._last_next_scheduled = None
                 self._last_next_scheduled_ts = None
-            except Exception:
-                pass
+            except Exception as error:
+                self.list_error = str(error)
+                _LOGGER.warning(
+                    "Cannot refresh playlists; retaining last successful list: %s",
+                    error,
+                )
 
+        status["_lists_error"] = self.list_error
         status["_playlists"] = self._last_playlists or []
         # Stamp the time this payload was fetched so entities can animate progress
-        status["_ts"] = dt_util.utcnow()
+        status["_ts"] = fetched_at
 
         try:
             next_sched = await self._async_compute_next_scheduled()
             status["_next_scheduled"] = next_sched
         except Exception:
             status["_next_scheduled"] = None
+        status["_lists_error"] = self.list_error
 
         # Fire HA events on schedule start/stop
         cur_sched_id: str | None = None
-        raw_id = str(status.get("scheduleid", "")) if isinstance(status, dict) else ""
-        if status.get("status") in ("playing", "paused") and raw_id and raw_id.upper() != "N/A":
+        raw_id = str(status.get("scheduleid") or "") if isinstance(status, dict) else ""
+        if (
+            status.get("status") in ("playing", "paused")
+            and raw_id
+            and raw_id.upper() != "N/A"
+        ):
             cur_sched_id = raw_id
+
+        if self._last_schedule_id and cur_sched_id != self._last_schedule_id:
+            # schedule ended
+            self.hass.bus.async_fire(
+                EVENT_SCHEDULE_ENDED,
+                {
+                    "scheduleid": self._last_schedule_id,
+                    "schedulename": self._last_schedule_name,
+                    "scheduleend": self._last_schedule_end,
+                    "playlistid": self._last_playlist_id,
+                    "playlist": self._last_playlist,
+                    **self.event_context,
+                    "host": self.client.host,
+                    "port": self.client.port,
+                    "base_url": self.client.base_url,
+                },
+            )
+            self._last_schedule_name = None
+            self._last_schedule_end = None
 
         if cur_sched_id and cur_sched_id != self._last_schedule_id:
             # schedule started (or changed)
@@ -216,7 +278,7 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                     "playlistid": status.get("playlistid"),
                     "playlist": status.get("playlist"),
                     "scheduleend": status.get("scheduleend"),
-                    "device": f"{DOMAIN}:{id(self)}",
+                    **self.event_context,
                     "host": self.client.host,
                     "port": self.client.port,
                     "base_url": self.client.base_url,
@@ -225,25 +287,6 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
             # Remember schedule context for matching ended event
             self._last_schedule_name = status.get("schedulename")
             self._last_schedule_end = status.get("scheduleend")
-
-        if self._last_schedule_id and not cur_sched_id:
-            # schedule ended
-            self.hass.bus.async_fire(
-                EVENT_SCHEDULE_ENDED,
-                {
-                    "scheduleid": self._last_schedule_id,
-                    "schedulename": self._last_schedule_name,
-                    "scheduleend": self._last_schedule_end,
-                    "playlistid": self._last_playlist_id,
-                    "playlist": self._last_playlist,
-                    "device": f"{DOMAIN}:{id(self)}",
-                    "host": self.client.host,
-                    "port": self.client.port,
-                    "base_url": self.client.base_url,
-                },
-            )
-            self._last_schedule_name = None
-            self._last_schedule_end = None
 
         self._last_schedule_id = cur_sched_id
 
@@ -258,7 +301,8 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
 
         # Playlist start/end (covers idle<->playing and playlist changes while playing)
         if self._last_playlist and (
-            cur_playlist != self._last_playlist or cur_status not in ("playing", "paused")
+            cur_playlist != self._last_playlist
+            or cur_status not in ("playing", "paused")
         ):
             self.hass.bus.async_fire(
                 EVENT_PLAYLIST_ENDED,
@@ -266,7 +310,7 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                     "playlist": self._last_playlist,
                     "playlistid": self._last_playlist_id,
                     "status": cur_status,
-                    "device": f"{DOMAIN}:{id(self)}",
+                    **self.event_context,
                 },
             )
 
@@ -282,12 +326,13 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                         "playlistid": cur_playlist_id,
                         "status": cur_status,
                         "trigger": status.get("trigger"),
-                        "device": f"{DOMAIN}:{id(self)}",
+                        **self.event_context,
                     },
                 )
 
         # Step changed
-        if cur_step != self._last_step:
+        step_key = (cur_playlist_id or cur_playlist, cur_step_id or cur_step)
+        if step_key != self._last_step_key:
             if cur_step or self._last_step:
                 self.hass.bus.async_fire(
                     EVENT_STEP_CHANGED,
@@ -298,7 +343,7 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                         "stepid": cur_step_id,
                         "previous_step": self._last_step,
                         "status": cur_status,
-                        "device": f"{DOMAIN}:{id(self)}",
+                        **self.event_context,
                     },
                 )
 
@@ -311,12 +356,15 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                     "playlist": cur_playlist,
                     "playlistid": cur_playlist_id,
                     "status": cur_status,
-                    "device": f"{DOMAIN}:{id(self)}",
+                    **self.event_context,
                 },
             )
 
         # Playlist loop state changed
-        if self._last_playlist_loop is not None and cur_loop != self._last_playlist_loop:
+        if (
+            self._last_playlist_loop is not None
+            and cur_loop != self._last_playlist_loop
+        ):
             self.hass.bus.async_fire(
                 EVENT_PLAYLIST_LOOP_CHANGED,
                 {
@@ -324,7 +372,7 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                     "playlist": cur_playlist,
                     "playlistid": cur_playlist_id,
                     "status": cur_status,
-                    "device": f"{DOMAIN}:{id(self)}",
+                    **self.event_context,
                 },
             )
 
@@ -333,6 +381,7 @@ class XScheduleCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         self._last_playlist = cur_playlist
         self._last_playlist_id = cur_playlist_id
         self._last_step = cur_step
+        self._last_step_key = step_key
         self._last_output = cur_output
         self._last_playlist_loop = cur_loop
 

@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .const import CONF_LISTS_REFRESH_SECS, DEFAULT_LISTS_REFRESH_SECS, player_key
 from .client import XScheduleClient
 from .coordinator import XScheduleCoordinator
 from .const import DOMAIN, INTEGRATION_VERSION, slugify_entry_title
@@ -18,16 +19,20 @@ from .const import DOMAIN, INTEGRATION_VERSION, slugify_entry_title
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
     data = hass.data[DOMAIN][entry.entry_id]
     client: XScheduleClient = data["client"]
     coordinator: XScheduleCoordinator = data["coordinator"]
 
-    async_add_entities([
-        PlaylistSelect(hass, client, coordinator, entry),
-        StepSelect(hass, client, coordinator, entry),
-        BackgroundPlaylistSelect(hass, client, coordinator, entry),
-    ])
+    async_add_entities(
+        [
+            PlaylistSelect(hass, client, coordinator, entry),
+            StepSelect(hass, client, coordinator, entry),
+            BackgroundPlaylistSelect(hass, client, coordinator, entry),
+        ]
+    )
 
 
 class PlaylistSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
@@ -35,20 +40,28 @@ class PlaylistSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
     _attr_translation_key = "playlist"
     _attr_icon = "mdi:playlist-music"
 
-    def __init__(self, hass: HomeAssistant, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        client: XScheduleClient,
+        coordinator: XScheduleCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
         super().__init__(coordinator)
         self.hass = hass
         self._client = client
         self._entry = entry
-        self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:select_playlist"
+        self._attr_unique_id = f"{player_key(entry)}:select_playlist"
         device_slug = slugify_entry_title(entry)
         self.entity_id = f"select.{DOMAIN}_{device_slug}_playlist"
 
     @property
     def device_info(self):
-        xs_ver = (self.coordinator.data or {}).get("version") if self.coordinator else None
+        xs_ver = (
+            (self.coordinator.data or {}).get("version") if self.coordinator else None
+        )
         return {
-            "identifiers": {(DOMAIN, f"{self._entry.data['host']}:{self._entry.data['port']}")},
+            "identifiers": {(DOMAIN, f"{player_key(self._entry)}")},
             "name": "xLights Scheduler",
             "manufacturer": "xLights",
             "model": "xSchedule",
@@ -57,7 +70,9 @@ class PlaylistSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
 
     @property
     def options(self) -> list[str]:
-        playlists = self.coordinator.data.get("_playlists") if self.coordinator.data else []
+        playlists = (
+            self.coordinator.data.get("_playlists") if self.coordinator.data else []
+        )
         return [pl.get("name") for pl in playlists or [] if pl.get("name")]
 
     @property
@@ -81,25 +96,36 @@ class StepSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
     _attr_translation_key = "step"
     _attr_icon = "mdi:format-list-numbered"
 
-    def __init__(self, hass: HomeAssistant, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        client: XScheduleClient,
+        coordinator: XScheduleCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
         super().__init__(coordinator)
         self.hass = hass
         self._client = client
         self._entry = entry
-        self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:select_step"
+        self._attr_unique_id = f"{player_key(entry)}:select_step"
         device_slug = slugify_entry_title(entry)
         self.entity_id = f"select.{DOMAIN}_{device_slug}_step"
         self._cached_steps: dict[str, list[str]] = {}
         self._last_playlist: str | None = None
         self._steps_cache_ts: dict[str, Any] = {}
         # Shorter TTL so step lists keep fresh more quickly after changes
-        self._steps_ttl_secs: int = 15
+        self._steps_ttl_secs: int = entry.options.get(
+            CONF_LISTS_REFRESH_SECS, DEFAULT_LISTS_REFRESH_SECS
+        )
+        self._refresh_task = None
 
     @property
     def device_info(self):
-        xs_ver = (self.coordinator.data or {}).get("version") if self.coordinator else None
+        xs_ver = (
+            (self.coordinator.data or {}).get("version") if self.coordinator else None
+        )
         return {
-            "identifiers": {(DOMAIN, f"{self._entry.data['host']}:{self._entry.data['port']}")},
+            "identifiers": {(DOMAIN, f"{player_key(self._entry)}")},
             "name": "xLights Scheduler",
             "manufacturer": "xLights",
             "model": "xSchedule",
@@ -124,12 +150,12 @@ class StepSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
 
     @property
     def available(self) -> bool:
-        return bool(self._get_active_playlist())
+        return super().available and bool(self._get_active_playlist())
 
     @property
     def current_option(self) -> str | None:
         data = self.coordinator.data or {}
-        return data.get("step")
+        return data.get("step") if data.get("step") in self.options else None
 
     async def async_update(self) -> None:
         pl = self._get_active_playlist()
@@ -139,7 +165,10 @@ class StepSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
                 need_refresh = True
             else:
                 ts = self._steps_cache_ts.get(pl)
-                if not ts or (dt_util.utcnow() - ts).total_seconds() > self._steps_ttl_secs:
+                if (
+                    not ts
+                    or (dt_util.utcnow() - ts).total_seconds() > self._steps_ttl_secs
+                ):
                     need_refresh = True
             if need_refresh:
                 steps = await self._client.get_steps(pl)
@@ -151,10 +180,22 @@ class StepSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
         if pl:
             expired = False
             if pl in self._steps_cache_ts:
-                expired = (dt_util.utcnow() - self._steps_cache_ts[pl]).total_seconds() > self._steps_ttl_secs
+                expired = (
+                    dt_util.utcnow() - self._steps_cache_ts[pl]
+                ).total_seconds() > self._steps_ttl_secs
             if pl != self._last_playlist or expired or pl not in self._cached_steps:
                 self._last_playlist = pl
-                self.hass.async_create_task(self.async_update())
+                if self._refresh_task is None or self._refresh_task.done():
+                    self._refresh_task = self._entry.async_create_background_task(
+                        self.hass, self._refresh_steps(), "Refresh xSchedule steps"
+                    )
+        self.async_write_ha_state()
+
+    async def _refresh_steps(self):
+        try:
+            await self.async_update()
+        except Exception as error:
+            _LOGGER.warning("Cannot refresh step choices: %s", error)
         self.async_write_ha_state()
 
     async def async_select_option(self, option: str) -> None:
@@ -163,8 +204,8 @@ class StepSelect(CoordinatorEntity[XScheduleCoordinator], SelectEntity):
             return
         store = self.hass.data[DOMAIN][self._entry.entry_id]
         store["selected_playlist"] = pl
-        store["selected_step"] = option
-        await self._client.command("Play playlist step", parameters=f"{pl},{option}")
+        await self._client.play_step(pl, option)
+        store.pop("selected_step", None)
         await self.coordinator.async_request_refresh()
 
 
@@ -174,20 +215,28 @@ class BackgroundPlaylistSelect(CoordinatorEntity[XScheduleCoordinator], SelectEn
     _attr_entity_category = EntityCategory.CONFIG
     _attr_icon = "mdi:playlist-music-outline"
 
-    def __init__(self, hass: HomeAssistant, client: XScheduleClient, coordinator: XScheduleCoordinator, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        client: XScheduleClient,
+        coordinator: XScheduleCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
         super().__init__(coordinator)
         self.hass = hass
         self._client = client
         self._entry = entry
-        self._attr_unique_id = f"{entry.data['host']}:{entry.data['port']}:select_background_playlist"
+        self._attr_unique_id = f"{player_key(entry)}:select_background_playlist"
         device_slug = slugify_entry_title(entry)
         self.entity_id = f"select.{DOMAIN}_{device_slug}_background_playlist"
 
     @property
     def device_info(self):
-        xs_ver = (self.coordinator.data or {}).get("version") if self.coordinator else None
+        xs_ver = (
+            (self.coordinator.data or {}).get("version") if self.coordinator else None
+        )
         return {
-            "identifiers": {(DOMAIN, f"{self._entry.data['host']}:{self._entry.data['port']}")},
+            "identifiers": {(DOMAIN, f"{player_key(self._entry)}")},
             "name": "xLights Scheduler",
             "manufacturer": "xLights",
             "model": "xSchedule",
@@ -196,19 +245,25 @@ class BackgroundPlaylistSelect(CoordinatorEntity[XScheduleCoordinator], SelectEn
 
     @property
     def options(self) -> list[str]:
-        playlists = self.coordinator.data.get("_playlists") if self.coordinator.data else []
+        playlists = (
+            self.coordinator.data.get("_playlists") if self.coordinator.data else []
+        )
         names = [pl.get("name") for pl in playlists or [] if pl.get("name")]
         return ["Clear background"] + names
 
     @property
     def current_option(self) -> str | None:
-        return self.hass.data[DOMAIN][self._entry.entry_id].get("background_playlist")
+        return self.coordinator.background_playlist
+
+    @property
+    def assumed_state(self) -> bool:
+        return True
 
     async def async_select_option(self, option: str) -> None:
         if option == "Clear background":
             await self._client.command("Clear background playlist")
-            self.hass.data[DOMAIN][self._entry.entry_id]["background_playlist"] = None
+            self.coordinator.background_playlist = "Clear background"
         else:
-            await self._client.command("Set playlist as background", parameters=option)
-            self.hass.data[DOMAIN][self._entry.entry_id]["background_playlist"] = option
+            await self._client.set_background(option)
+            self.coordinator.background_playlist = option
         await self.coordinator.async_request_refresh()
