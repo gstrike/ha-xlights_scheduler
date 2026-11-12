@@ -17,6 +17,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
+          cache-dependency-path: requirements-dev.txt
       - run: python -m pip install -r requirements-dev.txt
       - run: ruff check --select F custom_components scripts tests
       - run: ruff format --check custom_components scripts tests
